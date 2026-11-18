@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&display=swap">
-<link rel="stylesheet" href="css/lcd.css?v=mwmd7iyd">
+<link rel="stylesheet" href="css/lcd.css?v=mwmdihvu">
 <script>
 // a phone held upright gets the phone view from the first paint, before the wide screen can make the browser zoom out
 // (app/main.js keeps it in step after that). ?phone asks for it anywhere, ?desktop for the big screen on a phone
@@ -48,6 +48,24 @@
           <button class="btn" id="preset-export" title="Write every saved preset to a file on this computer">EXPORT</button>
           <button class="btn" id="preset-import" title="Read presets from an exported file and add them to the list">IMPORT</button>
           <input type="file" id="preset-file" accept=".json,application/json" hidden>
+        </div>
+      </div>
+    </div>
+    <div class="menu" id="kmenu">
+      <button class="btn kbtn" id="kits-btn" aria-haspopup="true" aria-expanded="false" title="The kit files you imported: hear their sounds, put one on a key, deal a whole kit">KITS ▾</button>
+      <div class="menupanel pleft kits" id="kits-panel" hidden>
+        <h3>KITS <span class="dim" id="kits-count"></span></h3>
+        <div class="randrow">
+          <button class="btn" id="kit-import" title="Read .SND kit files from this computer (you can also drop them on the page)">IMPORT KITS</button>
+          <button class="btn" id="kit-folder" title="Read every .SND kit file in a folder">IMPORT FOLDER</button>
+          <input type="file" id="kit-file" accept=".snd,.SND" multiple hidden>
+          <input type="file" id="kit-dir" webkitdirectory multiple hidden>
+        </div>
+        <div class="klist" id="kit-list"></div>
+        <h3>SOUND <span class="dim" id="kit-picked"></span></h3>
+        <div class="randrow">
+          <button class="btn" id="kit-put" title="Put the sound you clicked on the key played last (UNDO takes it back)">PUT ON KEY</button>
+          <select class="ktype" id="kit-type" aria-label="The sound's type" title="The sound's type: change it if the guess is wrong (it is kept)"></select>
         </div>
       </div>
     </div>
@@ -186,6 +204,6 @@
   }, 5000);
 })();
 </script>
-<script type="module" src="app/main.js?v=mwmd7iyd"></script>
+<script type="module" src="app/main.js?v=mwmdihvu"></script>
 </body>
 </html>

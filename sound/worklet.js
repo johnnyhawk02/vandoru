@@ -1,6 +1,6 @@
 // The audio worklet: a thin host for the instrument (sound/instrument.js). Messages from the page play and edit the
 // engines; every few blocks it sends back the engines' peaks and the sidechain's envelope for the meters.
-import { Instrument } from './instrument.js?v=mwmd7iyd';
+import { Instrument } from './instrument.js?v=mwmdihvu';
 
 class Host extends AudioWorkletProcessor {
   constructor() {

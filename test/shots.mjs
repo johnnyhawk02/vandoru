@@ -4,7 +4,7 @@
 // (save, load, export, import), ENGINES 1 to 6, the phone's pads with two fingers. Fails on any page error.
 // Serve the repo first, for example: python3 -m http.server 8123
 import { createRequire } from 'node:module';
-import { readFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 const { chromium } = createRequire(import.meta.url)('playwright');
 const url = process.argv[2] || 'http://127.0.0.1:8123/';
 const out = process.argv[3] || 'local/shots';
@@ -21,7 +21,7 @@ for (const [w, h] of [[1440, 900], [1280, 800], [1440, 760], [1280, 700]]) {
   const turn = async (el, up, dy = 14) => { const r = await el.boundingBox(), x = r.x + r.width / 2, y = r.y + r.height / 2;
     await p.mouse.move(x, y); await p.mouse.down(); for (let i = 1; i <= 4; i++) await p.mouse.move(x, y + (up ? -1 : 1) * dy * i / 4); await p.mouse.up(); };
   await p.goto(url); await p.waitForFunction(() => window.appReady);
-  await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForFunction(() => window.appReady);
+  await p.evaluate(() => { localStorage.clear(); indexedDB.deleteDatabase('vandoru'); }); await p.reload(); await p.waitForFunction(() => window.appReady);
   await p.click('#start-btn'); await p.waitForTimeout(300);
   for (const n of [50, 60, 70]) { await p.evaluate((n) => window.app.noteOn(1, n, 110), n); await p.waitForTimeout(60); }
   await p.evaluate(() => window.app.noteOn(1, 49, 100)); await p.waitForTimeout(100);
@@ -117,6 +117,31 @@ for (const [w, h] of [[1440, 900], [1280, 800], [1440, 760], [1280, 700]]) {
   const clean = await p.evaluate(() => window.app.presets.list().every((x) => !/[<>]/.test(x.name) && x.data.keys.every((k) => !/[<>]/.test(k.sound.name))));
   if (p4.n !== 0 || added !== 1 || p5.n !== 1 || !clean) bad('delete, import, sanitise', p4, added, p5, clean);
   await p.keyboard.press('Escape');
+  // KITS: import a kit file (one of the reference pack's when it's there, else a made-up one), the same file again,
+  // hear a sound, PUT ON KEY and UNDO, DEAL KIT, kept after a reload, then X and SURE? delete it
+  const packDir = 'local/pack/kits/', packKit = existsSync(packDir) && readdirSync(packDir).find((f) => /\.snd$/i.test(f));
+  const kitBuf = packKit ? readFileSync(packDir + packKit) : Buffer.from(Array.from({ length: 255 }, (_, i) => (i < 8 ? 'TESTKIT '.charCodeAt(i) : (i * 37) % 128)));
+  const kitFile = { name: packKit || 'TESTKIT.SND', mimeType: 'application/octet-stream', buffer: kitBuf };
+  const K = () => p.evaluate(() => ({ kits: window.app.kits.list().length, lib: window.app.library().length, msg: document.getElementById('detail').textContent, btn: document.getElementById('kits-btn').textContent }));
+  const k0 = await K();
+  await p.click('#kits-btn'); await p.setInputFiles('#kit-file', kitFile); await p.waitForTimeout(300); const k1 = await K();
+  await p.setInputFiles('#kit-file', kitFile); await p.waitForTimeout(300); const k2 = await K();
+  if (k0.kits !== 0 || !/none yet/.test(k0.btn) || k1.kits !== 1 || k1.lib !== k0.lib + 6 || !/imported 1 kit, 6 sounds/.test(k1.msg) || k2.kits !== 1 || !/already here/.test(k2.msg)) bad('kits import', k0, k1, k2);
+  await p.locator('.ksnd').first().click(); await p.waitForTimeout(100);
+  const was = await sounds(); await p.click('#kit-put'); await p.waitForTimeout(300);
+  const put = await p.evaluate(() => window.app.keys()[window.app.place()].sound);
+  await p.screenshot({ path: `${out}/kits-${w}x${h}.png` });
+  await p.keyboard.press('Escape'); await p.keyboard.press('z'); await p.waitForTimeout(100);
+  if (!put.from || !put.from.kit || put.from.slot !== 'drum 1' || 'kitHash' in put || (await sounds()) !== was) bad('PUT ON KEY and undo', put.from, put.kitHash);
+  await p.click('#kits-btn'); await p.locator('.khead .btn').first().click(); await p.waitForTimeout(300);
+  const dealt = await p.evaluate(() => { const S = window.app.state(), e = S.sel, ks = window.app.keys().filter((_, i) => window.app.engineOf(i) === e); return ks.map((k) => k.sound.from.slot || k.sound.from); });
+  if (dealt.slice(0, 6).join() !== 'drum 1,drum 2,drum 3,snare,metal,hat open' || dealt.length < 7) bad('DEAL KIT', dealt);
+  await p.keyboard.press('Escape'); await p.reload(); await p.waitForFunction(() => window.appReady); await p.evaluate(() => window.app.kits.ready());
+  await p.click('#start-btn'); await p.waitForTimeout(200);
+  const k3 = await K();
+  await p.click('#kits-btn'); const kd = p.locator('.khead .pdel').first(); await kd.click(); const sure = await kd.textContent(); await kd.click(); await p.waitForTimeout(300);
+  const k4 = await K(); await p.keyboard.press('Escape');
+  if (k3.kits !== 1 || sure !== 'SURE?' || k4.kits !== 0 || k4.lib !== k0.lib) bad('kits kept and deleted', k3, sure, k4);
   // the FX + MASTER tab
   await p.keyboard.press('f'); await p.waitForTimeout(100);
   const fx = await p.evaluate(() => [document.getElementById('fxside').hidden, document.querySelectorAll('#fxglobal .vf').length]);
