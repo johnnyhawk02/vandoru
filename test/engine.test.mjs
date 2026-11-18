@@ -5,6 +5,7 @@ import { defaultParams } from '../sound/params.js';
 import { TABLES, BANDS } from '../engine/waves.js';
 import { CLICKS, makeClick } from '../engine/clicks.js';
 import { Voice } from '../engine/voice.js';
+import { moved, lfoWave } from '../engine/mod.js';
 let fails = 0, checks = 0;
 const ok = (c, m) => { checks++; if (!c) { fails++; console.log('FAIL', m); } };
 const snd = (o) => ({ ...defaultParams(), cutoff: 127, type: 126, ...o });
@@ -106,6 +107,32 @@ for (let n = 2; n <= 13; n++) {
 { const v = new Voice(48000); v.trigger(snd({ click: 7, clickVol: 127, clickRate: 0 }), 100, 127);
   const w = new Voice(48000); w.trigger(snd({ click: 7, clickVol: 127, clickRate: 127 }), 100, 127);
   ok(Math.abs(v.cInc - 0.25 * 44140 / 48000) < 1e-9 && Math.abs(w.cInc / v.cInc - (0.25 + 127 / 33.9) / 0.25) < 1e-9, 'CLICK RATE plays a click from 0.25x to 4x'); }
+
+// modulation (SPEC 5.15, 6.4): how a target moves, stepped and choice targets, the LFO's waves
+ok(moved('cutoff', 64, 0.5, 0.5) === 64 && Math.abs(moved('cutoff', 64, 0.5, 1) - 127) < 1e-9 && Math.abs(moved('cutoff', 64, 0.5, 0) - 0.5) < 1e-9, 'a continuous target: m 0.5 leaves it, 1 adds the amount, 0 takes it off');
+ok(moved('tune', 60, 0.1, 0.75) === Math.floor(127 * (60 / 127 + 0.05)), 'TUNE steps in semitones');
+ok(moved('wave', 0, 0.5, 1) === 75 && moved('wave', 0, 1, 1) === 100 && moved('wave', 50, 0.05, 0.5) === 0, 'WAVE from a setting steps through the kit order (sine..pwm)');
+ok(moved('wave', 37.5, 0.1, 1) > 37.5 && !Number.isInteger(moved('wave', 37.5, 0.1, 1)), 'WAVE between two settings moves along the dial');
+ok(moved('type', 0, 1, 1) === 108 && moved('click', 2, 0.02, 1) === 0, 'TYPE never reaches OFF; CLICK steps from its number');
+ok(moved('velVol', true, 0.5, 0) === false && moved('velVol', false, 0.5, 1) === true, 'VEL VOL as a target');
+ok([0, 1, 2, 3, 4, 6, 7].every((w) => lfoWave(w, 0.25, 0) >= 0 && lfoWave(w, 0.25, 0) <= 1) && lfoWave(0, 0, 0) === 0 && lfoWave(4, 0.6, 0) === 1, 'LFO waves in 0..1');
+{ // an LFO on TUNE moves the pitch; RETRIG off lets it run on across notes of the same sound; another sound restarts it
+  const s = snd({ wave: 0, tune: 48, lfoDest: 'tune', lfoAmount: 30, lfoRate: 70, lfoWave: 1, decay: 127, kind: 'metal', velVol: false });
+  const v = new Voice(44140), b = new Float32Array(4410);
+  v.trigger(s, 100, 127); const p0 = v.lph; v.render(b, 4410); const p1 = v.lph;
+  v.trigger(s, 100, 127); const p2 = v.lph; v.trigger({ ...s, tune: 50 }, 100, 127); const p3 = v.lph;
+  ok(p0 === 0 && p1 > 0 && p2 === p1 && p3 === 0, `LFO phase: ${p0} ${p1.toFixed(3)} ${p2.toFixed(3)} ${p3}`);
+  v.trigger({ ...s, retrig: true, phase: 64 }, 100, 127); ok(Math.abs(v.lph - 64 / 127) < 1e-9, 'RETRIG starts the LFO at PHASE');
+}
+{ // velocity on DECAY: a soft hit is shorter, a hard one longer
+  const s = snd({ wave: 0, tune: 48, decay: 30, velDest: 'decay', velAmount: 60, kind: 'metal', velVol: false });
+  const a = lastAbove(renderSound(s, { vel: 20, seconds: 3 }), 1e-4), b = lastAbove(renderSound(s, { vel: 127, seconds: 3 }), 1e-4);
+  ok(b > a * 1.5, `velocity on DECAY: ${a} vs ${b} samples`);
+}
+{ // an LFO on PAN places each hit; the instrument latches it at the note's start
+  const s = snd({ lfoDest: 'pan', lfoAmount: 64, lfoWave: 4, phase: 100, retrig: true });
+  const v = new Voice(44140); v.trigger(s, 100, 127); ok(v.panFor(64) > 100, `an LFO on PAN moves the hit: ${v.panFor(64)}`);
+}
 
 // repeatability: the same render twice is identical
 { const s = snd({ wave: 125, decay: 40 }), a = renderSound(s), b = renderSound(s); ok(a.every((v, i) => v === b[i]), 'renders repeat exactly'); }

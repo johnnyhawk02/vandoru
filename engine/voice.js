@@ -1,16 +1,17 @@
 // The voice (SPEC section 5): one engine's sound, one note at a time. Pure JS, rate-agnostic: the envelopes count
 // control ticks of 64/44140 s on a clock of their own, whatever the audio rate.
 //
-// Built so far (build order steps 3 to 6): the tone with its six waves (band-limited) and the WAVE dial, its pitch
+// Built in build order steps 3 to 7: the tone with its six waves (band-limited) and the WAVE dial, its pitch
 // (TUNE, FINE), the pitch envelope, the snap and PHASE, mod A and mod B with one-sided FM, FM ENV and A MODE, noise,
 // the filter, the routing and finishing stage of each kind, drive and crush, the amp envelope (ATTACK, DECAY, CURVE,
 // REPEAT, glided in the drum kind, stepped in the others), LEVEL and velocity, the twelve generated clicks, and the end
-// of a sound. The modulation routes come in step 7; the voice runs as if they were at rest.
-import { TICK_S, noteHz, fineFactor, MOD_FINE, riseStep, decayStep, decayShape, attackShape, pCurveShape, pAmountDepth, clickRate, noiseHz, driveK, crushHz, shape } from './curves.js?v=mwmeexdh';
-import { Rand } from './rand.js?v=mwmeexdh';
-import { CLICKS, CLICK_FS } from './clicks.js?v=mwmeexdh';
-import { Filter } from './filter.js?v=mwmeexdh';
-import { TABLES, SINE, read, bandFor } from './waves.js?v=mwmeexdh';
+// of a sound, and the modulation routes: velocity and the LFO, each aimed at one of the sound's own parameters.
+import { TICK_S, noteHz, fineFactor, MOD_FINE, riseStep, decayStep, decayShape, attackShape, pCurveShape, pAmountDepth, clickRate, noiseHz, driveK, crushHz, shape } from './curves.js?v=mwmeshlj';
+import { Rand } from './rand.js?v=mwmeshlj';
+import { moved, lfoWave, lfoStep } from './mod.js?v=mwmeshlj';
+import { CLICKS, CLICK_FS } from './clicks.js?v=mwmeshlj';
+import { Filter } from './filter.js?v=mwmeshlj';
+import { TABLES, SINE, read, bandFor } from './waves.js?v=mwmeshlj';
 
 // the WAVE dial (SPEC 6.1), by position: sine 0, tri 25, saw 50, square 75, pwm 100, noise 125
 const STOPS = [0, 25, 50, 75, 100, 125];
@@ -58,16 +59,23 @@ export class Voice {
     this.crushC = 1; this.crushHeld = 0;
     this.levelNow = 0; this.driveNow = -1 / 128; // the drum kind's smoothed LEVEL and DRIVE start from rest and carry across notes
     this.sound = null; this.active = false;
-    this.freshNoise = false;
+    this.freshNoise = false; this.bpm = 120;
+    // the LFO (5.15): its phase runs on across notes unless RETRIG is on or the engine gets another sound
+    this.randL = new Rand(); this.lph = 0; this.lheld = 0; this.lastSig = null; this.lfoM = 0.5;
     this.lvlGlide = 1 - Math.exp(-1 / (0.0023 * fs)); // LEVEL's and DRIVE's smoothing in the drum kind, about 2.3 ms
   }
   /** a new note: the sound's parameters, the velocity (1..127) and LEVEL (0..127) */
-  trigger(sound, vel, level, note = 60) {
-    this.sound = sound; this.vel = vel; this.note = note;
-    this.set(sound, level);
+  trigger(knobs, vel, level, note = 60) {
+    this.vel = vel; this.note = note;
     // the note's noise: from a fixed seed (offline renders repeat exactly), or new on every live hit (FRESH NOISE)
     const seed = this.freshNoise ? this.seed.next() * 2147483647 + 2147483648 : 0x2545f491;
     this.rand.s = seed >>> 0 || 1; this.randA.s = (seed ^ 0x68e31da4) >>> 0 || 1; this.randB.s = (seed ^ 0xb5297a4d) >>> 0 || 1; this.randN.s = (seed ^ 0x1b873593) >>> 0 || 1;
+    // the LFO: back to PHASE when RETRIG is on or the sound is another one (5.15, 5.17)
+    const sig = JSON.stringify(knobs);
+    if (knobs.retrig || sig !== this.lastSig) { this.lph = knobs.phase / 127; this.randL.s = (seed ^ 0x85ebca6b) >>> 0 || 1; this.lheld = (this.randL.next() + 1) / 2; }
+    this.lastSig = sig;
+    this.set(knobs, level);
+    const sound = this.sound; // the parameters as modulated at the note's start
     // start phases (SPEC 5.4): the nearer wave's; PHASE moves the tone's back towards the cycle's start
     const near = (v) => { const [a, b, t] = dial(v); return t < 0.5 ? a : b; };
     const o = Math.round(sound.click) === 1 ? 1 - sound.clickVol / 127 : 1;
@@ -85,8 +93,37 @@ export class Voice {
     this.quiet = 0; this.active = true;
     if (this.kind === 0) this.filter.reset(); // the drum kind clears its filter (5.10)
   }
-  /** the sound's parameters changed (a knob turned while it rings) */
-  set(sound, level) {
+  /** the sound's knobs changed (a knob turned while it rings), or a new note's */
+  set(knobs, level) {
+    this.knobs = knobs; this.knobLevel = level;
+    this.velOn = !!knobs.velDest && knobs.velAmount > 0;
+    this.lfoOn = !!knobs.lfoDest && knobs.lfoAmount > 0;
+    this.modOn = this.velOn || this.lfoOn;
+    if (this.lfoOn) { this.lw = Math.round(knobs.lfoWave); this.lfoM = lfoWave(this.lw, this.lph, this.lheld); }
+    if (this.modOn) this.derive(...this.effective()); else this.derive(knobs, level);
+  }
+  /** the knobs as the modulators move them this tick, and the key's LEVEL: [sound, level] */
+  effective() {
+    const s = this.knobs, e = { ...s };
+    let lvl = this.knobLevel;
+    const apply = (id, amt, m) => {
+      if (id === 'level') lvl = moved('level', lvl, amt, m);
+      else if (id !== 'pan' && id in s) e[id] = moved(id, s[id], amt, m);
+    };
+    // both on one target: the LFO wins
+    if (this.velOn && !(this.lfoOn && s.lfoDest === s.velDest)) apply(s.velDest, s.velAmount / 127, this.vel / 127);
+    if (this.lfoOn) apply(s.lfoDest, s.lfoAmount / 127, this.lfoM);
+    return [e, lvl];
+  }
+  /** the key's PAN as the modulators place this note (pan is latched at the note's start, 5.14) */
+  panFor(p) {
+    const s = this.knobs;
+    if (this.lfoOn && s.lfoDest === 'pan') return moved('pan', p, s.lfoAmount / 127, this.lfoM);
+    if (this.velOn && s.velDest === 'pan') return moved('pan', p, s.velAmount / 127, this.vel / 127);
+    return p;
+  }
+  /** everything the voice works out from the parameters (as modulated) */
+  derive(sound, level) {
     this.sound = sound;
     this.levelTo = Math.max(0, Math.min(127, level)) / 127;
     this.kind = sound.kind === 'snare' ? 1 : sound.kind === 'metal' ? 2 : 0;
@@ -125,6 +162,17 @@ export class Voice {
   }
   /** one control tick: the envelopes move, the oscillators pick their tables */
   tick() {
+    // the modulators: the LFO's output this tick, the targets moved, then the LFO steps on (once per tick)
+    if (this.modOn) {
+      if (this.lfoOn) this.lfoM = lfoWave(this.lw, this.lph, this.lheld);
+      const [e, l] = this.effective();
+      this.derive(e, l);
+      if (this.lfoOn) {
+        this.lw = Math.round(e.lfoWave);
+        this.lph += lfoStep(e.lfoRate, e.lfoSync, this.bpm);
+        if (this.lph >= 1) { this.lph -= Math.floor(this.lph); this.lheld = (this.randL.next() + 1) / 2; }
+      }
+    }
     const wasAttack = this.stage === 'att' || this.stage === 'rep';
     let out = 0;
     switch (this.stage) {

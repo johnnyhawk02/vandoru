@@ -1,13 +1,14 @@
 // The oscillators' waves (SPEC 5.4): sine, triangle, saw, square, pwm and noise. Triangle, saw and square are
 // band-limited tables built from their harmonic series, one table per octave band of the playing frequency, with the
-// harmonic counts of the spec and a smooth roll-off towards the top; each is scaled so its peak is full scale.
+// harmonic counts of the spec (the triangle below 440 Hz with all its audible harmonics) and a smooth roll-off
+// towards the top; each is scaled so its peak is full scale.
 // pwm is the difference of two band-limited saws. Pure maths, built once at start-up.
 
 export const TABLE = 2048;
 const MASK = TABLE - 1;
 /** the octave bands' upper edges in Hz, and each wave's harmonic limit in each band */
 const EDGES = [440, 880, 1760, 3520, 7040, 14080, Infinity];
-const LIMITS = { saw: [45, 28, 16, 9, 5, 2, 1], square: [49, 31, 17, 12, 8, 5, 3], tri: [9, 9, 7, 5, 3, 3, 3] };
+const LIMITS = { saw: [45, 28, 16, 9, 5, 2, 1], square: [49, 31, 17, 12, 8, 5, 3], tri: [49, 9, 7, 5, 3, 3, 3] };
 export const BANDS = EDGES.length;
 
 // the roll-off: about 0.9 near a third of the limit, 0.4 at the limit

@@ -1,7 +1,7 @@
 // The voice's filter (SPEC 5.10): a two-pole state-variable filter in the zero-delay-feedback (trapezoidal) form, its
 // first integrator's state soft-saturated, giving LP, BP, UNITY BP, HP, NOTCH and PEAK from one state; LP2, a
 // separate pair of one-poles with feedback; and OFF. The TYPE dial crossfades two types' outputs (SPEC 6.2).
-import { cutoffHz, damping, filterGain } from './curves.js?v=mwmeexdh';
+import { cutoffHz, damping, filterGain } from './curves.js?v=mwmeshlj';
 
 // the TYPE dial's settings by position: LP 0, BP 18, UNITY BP 36, HP 54, NOTCH 72, PEAK 90, LP2 108, OFF 126
 export const LP = 0, BP = 1, UBP = 2, HP = 3, NOTCH = 4, PEAK = 5, LP2 = 6, OFF = 7;
