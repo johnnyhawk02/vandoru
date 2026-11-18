@@ -1,7 +1,7 @@
 // A stand-in voice for the first steps: a plain sine at the sound's pitch that dies away over its DECAY, at its
 // LEVEL and velocity. It only keeps the page playable until the real voice (SPEC 5) takes its place; the instrument
 // around it doesn't change when it does.
-import { noteHz, fineFactor, decayS } from './curves.js?v=mwmd7iyd';
+import { noteHz, fineFactor, decayS } from './curves.js?v=mwmdihvu';
 
 export class StubVoice {
   constructor(fs) { this.fs = fs; this.phase = 0; this.env = 0; this.mul = 0; this.inc = 0; this.gain = 0; this.sound = null; }

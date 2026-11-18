@@ -1,13 +1,14 @@
 // VANDORU: the page. 25 keys on MIDI channel 1, split between 1 to 6 mono engines; every key has its own sound, and
 // the knobs edit the key played last. The sound engine is in engine/ and sound/ (no UI there); this file holds the
 // state, the keys, MIDI, the knob grid, the randomisers, undo, presets, the FX + MASTER tab and the phone view.
-import { $, clamp, dragger, hbar, knob, switchCell, LOCK_SVG, DICE_SVG, makeDice } from './widgets.js?v=mwmd7iyd';
-import { setupColours } from './colours.js?v=mwmd7iyd';
-import { presetName, jumble } from './names.js?v=mwmd7iyd';
-import { PARAMS, PARAM, OUT_PARAMS, GRID_ROWS, GRID_COLS, cells, TARGETS, targetLabel, showValue, noteName, dialAt } from '../sound/params.js?v=mwmd7iyd';
-import { MAX_ENGINES, RETURNS, fxDefaults } from '../sound/instrument.js?v=mwmd7iyd';
-import { DIRT_DEFAULTS, dirtHz, scHz, decayMs, volDb, pregainDb, bassDb } from '../sound/dirt.js?v=mwmd7iyd';
-import { KEYS, DEFAULT_ENGINES, DEFAULT_LOW, TYPES, zones, engineOf, tidySound, newKey, tidyKey, tidyPatch, tidyFx, cleanName, canon, copySound } from './patch.js?v=mwmd7iyd';
+import { $, clamp, dragger, hbar, knob, switchCell, LOCK_SVG, DICE_SVG, makeDice } from './widgets.js?v=mwmdihvu';
+import { setupColours } from './colours.js?v=mwmdihvu';
+import { presetName, jumble } from './names.js?v=mwmdihvu';
+import { PARAMS, PARAM, OUT_PARAMS, GRID_ROWS, GRID_COLS, cells, TARGETS, targetLabel, showValue, noteName, dialAt } from '../sound/params.js?v=mwmdihvu';
+import { MAX_ENGINES, RETURNS, fxDefaults } from '../sound/instrument.js?v=mwmdihvu';
+import { DIRT_DEFAULTS, dirtHz, scHz, decayMs, volDb, pregainDb, bassDb } from '../sound/dirt.js?v=mwmdihvu';
+import { setupKits } from './kits.js?v=mwmdihvu';
+import { KEYS, DEFAULT_ENGINES, DEFAULT_LOW, TYPES, zones, engineOf, tidySound, newKey, tidyKey, tidyPatch, tidyFx, cleanName, canon, copySound } from './patch.js?v=mwmdihvu';
 
 const STORE = 'vandoru-v1', PRESET_STORE = 'vandoru-presets-v1';
 const engName = (e) => `ENGINE ${e + 1}`;
@@ -16,9 +17,10 @@ const say = (html) => { $('detail').innerHTML = html; };
 // ---------------------------------------------------------------------------------------------------------------
 // the library: the starter set (hand-made, SPEC 8.6) and, from step 2, the imported kits' sounds
 // ---------------------------------------------------------------------------------------------------------------
-const STARTER = (await (await fetch(new URL('../sounds/starter.json?v=mwmd7iyd', import.meta.url))).json()).map(tidySound);
+const STARTER = (await (await fetch(new URL('../sounds/starter.json?v=mwmdihvu', import.meta.url))).json()).map(tidySound);
 const starterOf = (type) => STARTER.find((s) => s.type === type) || STARTER[0];
-const library = () => STARTER;
+let kits = { library: () => [], close() {} }; // the imported kits (the KITS menu, set up below)
+const library = () => [...STARTER, ...kits.library()];
 // CLEAR: the engine's base sound, round the starter set
 const BASE_TYPES = ['kick', 'snare', 'closed hat', 'tom', 'clap', 'open hat'];
 const baseSound = (e) => starterOf(BASE_TYPES[e % BASE_TYPES.length]);
@@ -86,7 +88,7 @@ const send = (m) => { if (node) node.port.postMessage(m); };
 async function startAudio() {
   if (ctx) { if (ctx.state !== 'running') await ctx.resume(); return; }
   ctx = new AudioContext({ latencyHint: 'interactive' });
-  await ctx.audioWorklet.addModule(new URL('../sound/worklet.js?v=mwmd7iyd', import.meta.url));
+  await ctx.audioWorklet.addModule(new URL('../sound/worklet.js?v=mwmdihvu', import.meta.url));
   node = new AudioWorkletNode(ctx, 'vandoru', { numberOfInputs: 0, outputChannelCount: [2] });
   node.port.onmessage = (e) => { if (e.data.type === 'peaks') { showPeaks(e.data.peaks); showSc(e.data.sc || 0); } };
   node.connect(ctx.destination);
@@ -623,8 +625,8 @@ $('lock-none').addEventListener('click', () => {
 function drawSide() { $('rand-name').textContent = engName(S.sel); randDraws.forEach((d) => d()); drawLocks(); drawInit(); }
 
 // ---- the menus: RANDOM, SETTINGS and PRESET open one at a time and close on a press outside or Esc ----
-function openMenu(open) { $('menu-panel').hidden = !open; $('menu-btn').setAttribute('aria-expanded', open); if (initArmed) disarmInit(); if (open) { openPresets(false); openSettings(false); drawSide(); } }
-function openSettings(open) { $('settings-panel').hidden = !open; $('settings-btn').setAttribute('aria-expanded', open); if (open) { openMenu(false); openPresets(false); } }
+function openMenu(open) { $('menu-panel').hidden = !open; $('menu-btn').setAttribute('aria-expanded', open); if (initArmed) disarmInit(); if (open) { openPresets(false); openSettings(false); kits.close(); drawSide(); } }
+function openSettings(open) { $('settings-panel').hidden = !open; $('settings-btn').setAttribute('aria-expanded', open); if (open) { openMenu(false); openPresets(false); kits.close(); } }
 $('menu-btn').addEventListener('click', () => openMenu($('menu-panel').hidden));
 $('settings-btn').addEventListener('click', () => openSettings($('settings-panel').hidden));
 document.addEventListener('pointerdown', (e) => {
@@ -885,9 +887,35 @@ function drawPreset() {
 }
 function openPresets(open) {
   $('preset-panel').hidden = !open; $('preset-btn').setAttribute('aria-expanded', open);
-  if (open) { openMenu(false); openSettings(false); drawPreset(); } else if (delArmed) { clearTimeout(delT); delArmed = null; }
+  if (open) { openMenu(false); openSettings(false); kits.close(); drawPreset(); } else if (delArmed) { clearTimeout(delT); delArmed = null; }
 }
 $('preset-btn').addEventListener('click', () => openPresets($('preset-panel').hidden));
+
+// ---- KITS (SPEC 8.2): the imported kit files, kept in this browser; their sounds join the library ----
+kits = setupKits({
+  say, starterNames: STARTER.map((s) => s.name),
+  closeOthers: () => { openMenu(false); openPresets(false); openSettings(false); },
+  onChange: () => drawSide(),
+  // hear a kit sound on the selected engine, at the selected key's output, without changing the key
+  hear: async (s) => {
+    await startAudio();
+    const k = curKey(); engKey[S.sel] = -1;
+    send({ type: 'play', engine: S.sel, vel: 100, back: false, sound: s.params, out: { ...k.out, trim: 0 } });
+  },
+  putOnKey: (s) => {
+    const p = place(); if (keyLocked(p)) { lockedMsg(); return; }
+    change(() => deal(p, s), `${keyName(p)}: <em>${s.name}</em> (${s.type}), ${s.from.kit} ${s.from.slot}${keptNote([engineOfKey(p)])} (UNDO takes it back)`).then(() => play(p, 100));
+  },
+  // the kit's sounds on the selected engine's keys from the bottom up, then again, altered, for the keys beyond them
+  dealKit: (sounds, name) => {
+    const ps = zoneKeys(S.sel);
+    change(() => ps.forEach((p, i) => {
+      if (S.keys[p].lock) return;
+      deal(p, sounds[i % sounds.length]);
+      if (i >= sounds.length) { alterOne(p, alterDepth()); S.keys[p].home = null; }
+    }), `${engName(S.sel)}: the kit <em>${name}</em> on its ${ps.length} keys${ps.length > sounds.length ? `, altered ${S.rand.alter}% past the first ${sounds.length}` : ''}${keysKept(ps)}${keptNote([S.sel])} (UNDO takes it back)`);
+  },
+});
 $('preset-input').addEventListener('change', () => renamePreset($('preset-input').value));
 $('preset-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('preset-input').blur(); });
 $('preset-roll').addEventListener('click', () => renamePreset(newName()));
@@ -1032,5 +1060,6 @@ window.app = {
   noteOn: (ch, note, vel = 100) => noteOn(ch, note, vel), noteOff, cc: onCC, state: () => S, keys: () => S.keys, place,
   presets: { list: () => presets, now: () => S.preset, dirty: presetDirty, import: importPresets, name: newName },
   undoDepth: () => undoStack.length, library, engineOf: engineOfKey,
+  kits: { list: () => kits.kits(), ready: () => kits.ready },
 };
 window.appReady = true; // index.html's load check

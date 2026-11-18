@@ -1,7 +1,7 @@
 // The patch's data: the 25 keys and how the engines split them, sounds, and the tidying every stored or imported
 // patch goes through (names, labels, ranges and sizes: messages are shown as HTML). SPEC section 10. No UI here.
-import { tidyParams, PARAM_IDS, PARAM, OUT_DEFAULTS } from '../sound/params.js?v=mwmd7iyd';
-import { fxDefaults, MAX_ENGINES } from '../sound/instrument.js?v=mwmd7iyd';
+import { tidyParams, PARAM_IDS, PARAM, OUT_DEFAULTS } from '../sound/params.js?v=mwmdihvu';
+import { fxDefaults, MAX_ENGINES } from '../sound/instrument.js?v=mwmdihvu';
 
 export const KEYS = 25;
 export const DEFAULT_ENGINES = 3;
