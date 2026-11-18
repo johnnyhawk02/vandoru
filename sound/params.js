@@ -2,7 +2,7 @@
 // engine has every one of them. Values are the kit's units, 0..127 (a dial or a morph may hold a fraction); switches
 // are true/false, the two modulation targets a parameter id or null, KIND 'drum', 'snare' or 'metal'.
 import { noteHz, fineFactor, attackS, decayS, pDecayS, cutoffHz, noiseHz, crushHz, clickRate, lfoHz, pAmountDepth,
-  SYNC_NAMES } from '../engine/curves.js?v=mwmdihvu';
+  SYNC_NAMES } from '../engine/curves.js?v=mwmdta0r';
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 /** a note number as a name (C3 = 60) */

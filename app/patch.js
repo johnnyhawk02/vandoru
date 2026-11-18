@@ -1,7 +1,7 @@
 // The patch's data: the 25 keys and how the engines split them, sounds, and the tidying every stored or imported
 // patch goes through (names, labels, ranges and sizes: messages are shown as HTML). SPEC section 10. No UI here.
-import { tidyParams, PARAM_IDS, PARAM, OUT_DEFAULTS } from '../sound/params.js?v=mwmdihvu';
-import { fxDefaults, MAX_ENGINES } from '../sound/instrument.js?v=mwmdihvu';
+import { tidyParams, PARAM_IDS, PARAM, OUT_DEFAULTS } from '../sound/params.js?v=mwmdta0r';
+import { fxDefaults, MAX_ENGINES } from '../sound/instrument.js?v=mwmdta0r';
 
 export const KEYS = 25;
 export const DEFAULT_ENGINES = 3;
@@ -19,13 +19,16 @@ export const cleanName = (s) => String(s ?? '').toUpperCase().replace(/[^A-Z0-9 
 export const cleanLabel = (s) => String(s ?? '').replace(/[<>&"'\u0000-\u001f]/g, '').slice(0, 48);
 const num = (x, lo, hi, d) => { const v = Number(x); return Number.isFinite(v) ? clamp(v, lo, hi) : d; };
 
-/** a sound: { v, name, type, kind, from, params } */
+/** a sound: { v, name, type, kind, from, params, level? } */
 export function tidySound(s) {
   if (!s || typeof s !== 'object') return null;
   const params = tidyParams(s.params);
   const from = s.from === 'starter' || s.from === 'made' ? s.from
     : s.from && typeof s.from === 'object' ? { kit: cleanLabel(s.from.kit).slice(0, 12), slot: cleanLabel(s.from.slot).slice(0, 12) } : 'made';
-  return { v: 1, name: cleanName(s.name) || 'UNNAMED', type: TYPES.includes(s.type) ? s.type : 'other', kind: params.kind, from, params };
+  const o = { v: 1, name: cleanName(s.name) || 'UNNAMED', type: TYPES.includes(s.type) ? s.type : 'other', kind: params.kind, from, params };
+  // a kit sound's own LEVEL: the key takes it when the sound goes on (in metal and snare it sets how hard the drive is hit)
+  if (s.level != null && Number.isFinite(Number(s.level))) o.level = clamp(Number(s.level), 0, 127);
+  return o;
 }
 export const copySound = (s) => structuredClone(s);
 

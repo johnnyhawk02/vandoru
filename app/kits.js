@@ -2,12 +2,12 @@
 // file is read (sound/kitfile.js), its sounds named and typed, and kept with its bytes and their hash (the same file
 // twice is one kit). The KITS menu lists them: hear a sound, put it on the key played last, deal a whole kit onto an
 // engine, change a sound's type, delete a kit.
-import { $ } from './widgets.js?v=mwmdihvu';
-import { readKit, READER_VERSION, SLOT_NAMES } from '../sound/kitfile.js?v=mwmdihvu';
-import { tidyParams, noteName } from '../sound/params.js?v=mwmdihvu';
-import { guessType } from '../sound/types.js?v=mwmdihvu';
-import { jumble } from './names.js?v=mwmdihvu';
-import { TYPES, cleanLabel } from './patch.js?v=mwmdihvu';
+import { $ } from './widgets.js?v=mwmdta0r';
+import { readKit, READER_VERSION, SLOT_NAMES } from '../sound/kitfile.js?v=mwmdta0r';
+import { tidyParams, noteName } from '../sound/params.js?v=mwmdta0r';
+import { guessType } from '../sound/types.js?v=mwmdta0r';
+import { jumble } from './names.js?v=mwmdta0r';
+import { TYPES, cleanLabel } from './patch.js?v=mwmdta0r';
 
 // the sounds a kit gives the app: the closed hat is decoded but not used (Johnny: open hats only)
 const USED = ['drum1', 'drum2', 'drum3', 'snare', 'metal', 'hatOpen'];
@@ -42,7 +42,7 @@ function kitSounds(rec, taken) {
     const p = kit.sounds[slot], rng = seeded((parseInt(rec.hash.slice(0, 8), 16) ^ (i * 0x9e3779b9)) >>> 0 || 1);
     let name; do name = jumble(rng, 5, 9).toUpperCase(); while (taken.has(name)); taken.add(name);
     const type = TYPES.includes(rec.types?.[i]) ? rec.types[i] : guessType(slot, p);
-    const snd = { v: 1, name, type, kind: p.kind, from: { kit: kit.name, slot: SLOT_NAMES[slot] }, params: tidyParams(p) };
+    const snd = { v: 1, name, type, kind: p.kind, from: { kit: kit.name, slot: SLOT_NAMES[slot] }, params: tidyParams(p), level: p.level };
     // which kit it came from, for the list only: not copied with the sound onto a key (not enumerable)
     Object.defineProperty(snd, 'kitHash', { value: rec.hash });
     return snd;
