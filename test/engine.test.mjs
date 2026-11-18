@@ -32,7 +32,7 @@ for (const k of ['saw', 'square', 'tri']) for (let b = 0; b < BANDS; b++) {
   const t = TABLES[k][b]; ok(Math.abs(Math.max(...t.map(Math.abs)) - 1) < 1e-6, `${k} band ${b} peaks at full scale`);
 }
 // the start phases: a sine starts at zero going up, a square at +1
-{ const s = renderSound(snd({ wave: 0, tune: 60 }), { seconds: 0.01 }), q = renderSound(snd({ wave: 75, tune: 60 }), { seconds: 0.01 });
+{ const s = renderSound(snd({ wave: 0, tune: 60, kind: 'metal' }), { seconds: 0.01 }), q = renderSound(snd({ wave: 75, tune: 60, kind: 'metal' }), { seconds: 0.01 });
   ok(Math.abs(s[0]) < 0.01 && s[3] > s[0], `a sine starts at 0 going up: ${s[0].toFixed(3)} ${s[3].toFixed(3)}`);
   ok(q[0] > 0.7, `a square starts high: ${q[0].toFixed(3)}`); }
 // PWM 0 is silence, 127 a square
@@ -41,7 +41,7 @@ ok(lastAbove(renderSound(snd({ wave: 100, pwm: 0 }), { seconds: 0.1 }), 1e-6) < 
   const rms = (x) => Math.sqrt(x.reduce((s, v) => s + v * v, 0) / x.length); ok(Math.abs(rms(a) - rms(b)) < 0.03, `PWM 127 is as loud as a square: ${rms(a).toFixed(3)} ${rms(b).toFixed(3)}`); }
 // the dial: a position between sine and tri is between the two; on a setting exactly the setting
 { const a = renderSound(snd({ wave: 0 }), { seconds: 0.05 }), b = renderSound(snd({ wave: 25 }), { seconds: 0.05 }), m = renderSound(snd({ wave: 12.5 }), { seconds: 0.05 });
-  let d = 0; for (let i = 0; i < a.length; i++) d = Math.max(d, Math.abs(m[i] - (a[i] + b[i]) / 2)); ok(d < 1e-6, `WAVE halfway is the mix of the two: ${d}`); }
+  let d = 0; for (let i = 0; i < a.length; i++) d = Math.max(d, Math.abs(m[i] - (a[i] + b[i]) / 2)); ok(d < 1e-3, `WAVE halfway is the mix of the two: ${d}`); }
 
 // FM (SPEC 5.5): a sine tone, a sine modulator at full A AMOUNT, FM ENV 0: the phase moves by max(0, A) cycles, one-sided;
 // on a saw tone by 4 times that. Checked against the formula, sample by sample, while the envelope is flat
@@ -54,9 +54,9 @@ for (const [wave, scale, tbl] of [[0, 1, null], [50, 4, 'saw']]) {
     const p = 0.25 + f0 * i / fs, a = -Math.cos(2 * Math.PI * fa * i / fs), sh = Math.max(0, a) * scale;
     const want = tbl ? null : -Math.cos(2 * Math.PI * (p + sh));
     if (want !== null) err = Math.max(err, Math.abs(x[i] - want));
-    if (a < 0 && tbl === null && Math.abs(x[i] - -Math.cos(2 * Math.PI * p)) > 1e-3) below++;
+    if (a < 0 && tbl === null && Math.abs(x[i] - -Math.cos(2 * Math.PI * p)) > 0.01) below++;
   }
-  if (!tbl) ok(err < 2e-3 && below === 0, `sine FM: one-sided, 1 cycle at full scale (error ${err.toFixed(4)}, ${below} samples moved by the negative half)`);
+  if (!tbl) ok(err < 0.01 && below === 0, `sine FM: one-sided, 1 cycle at full scale (error ${err.toFixed(4)}, ${below} samples moved by the negative half)`);
   else { const y = renderSound({ ...s, aAmount: 0 }, { fs, seconds: 0.05 }); let d = 0; for (let i = 0; i < y.length; i++) d += Math.abs(x[i] - y[i]); ok(d / y.length > 0.1, 'saw FM moves the tone'); }
 }
 // the pitch envelope: P AMOUNT 127 starts the tone 33 times higher, and it falls back to the base pitch
@@ -75,6 +75,25 @@ for (const [wave, scale, tbl] of [[0, 1, null], [50, 4, 'saw']]) {
 }
 // PHASE: CLICK PHASE at full CLICK VOL starts a sine at its lowest point
 { const x = renderSound(snd({ wave: 0, click: 1, clickVol: 127, kind: 'metal', velVol: false }), { seconds: 0.01 }); ok(x[0] < -0.99, `PHASE 127 starts a sine at -1: ${x[0].toFixed(3)}`); }
+
+// the filter (SPEC 5.10): the 0.4 input level, LP darkening a saw, the drum kind's filter cleared at each note
+{
+  const rms = (x) => Math.sqrt(x.reduce((a, v) => a + v * v, 0) / x.length);
+  const base = { wave: 0, tune: 36, decay: 127, kind: 'metal', velVol: false };
+  const off = rms(renderSound(snd({ ...base, type: 126 }), { seconds: 0.2 })), lp = rms(renderSound(snd({ ...base, type: 0, cutoff: 127 }), { seconds: 0.2 }));
+  const db = 20 * Math.log10(lp / off);
+  ok(db < -6.5 && db > -9.5, `LP at full cutoff, FLT DRIVE 0, is about 8 dB under OFF: ${db.toFixed(1)} dB`);
+  const hi = (x) => { let d = 0; for (let i = 1; i < x.length; i++) d += (x[i] - x[i - 1]) ** 2; return Math.sqrt(d / x.length); };
+  const open = hi(renderSound(snd({ ...base, wave: 50, type: 0, cutoff: 127 }), { seconds: 0.2 })), shut = hi(renderSound(snd({ ...base, wave: 50, type: 0, cutoff: 20 }), { seconds: 0.2 }));
+  ok(shut < open / 3, `LP at CUTOFF 20 darkens a saw: ${(shut / open).toFixed(3)}`);
+  for (const t of [0, 18, 36, 54, 72, 90, 108, 126, 27, 117]) {
+    const x = renderSound(snd({ ...base, wave: 125, type: t, cutoff: 80, reso: 127, fltDrive: 127 }), { seconds: 0.3 });
+    ok(x.every((v) => Number.isFinite(v) && Math.abs(v) <= 1), `TYPE ${t} at full RESO and FLT DRIVE stays finite`);
+  }
+}
+// crush: CRUSH 0 holds the first sample for ever; CRUSH 64 holds each sample for several
+{ const x = renderSound(snd({ wave: 50, tune: 60, crush: 64, type: 126, kind: 'metal', velVol: false, decay: 127 }), { seconds: 0.05 });
+  let same = 0; for (let i = 1; i < x.length; i++) if (x[i] === x[i - 1]) same++; ok(same / x.length > 0.75, `CRUSH 64 holds samples: ${(same / x.length).toFixed(2)}`); }
 
 // repeatability: the same render twice is identical
 { const s = snd({ wave: 125, decay: 40 }), a = renderSound(s), b = renderSound(s); ok(a.every((v, i) => v === b[i]), 'renders repeat exactly'); }

@@ -1,8 +1,8 @@
 // The instrument: 1 to 6 mono engines, each playing one key's sound at a time, their mix, and the master (the
 // distortion, then the output level and a safety limiter). Pure JS, no DOM and no Web Audio: the worklet hosts it
 // for the speakers, and node runs it in the tests. The reverb send and the compressor come with step 9 (SPEC 7).
-import { Voice } from '../engine/voice.js?v=mwmdy8tl';
-import { Dirt, DIRT_DEFAULTS } from './dirt.js?v=mwmdy8tl';
+import { Voice } from '../engine/voice.js?v=mwme9jly';
+import { Dirt, DIRT_DEFAULTS } from './dirt.js?v=mwme9jly';
 
 export const MAX_ENGINES = 6;
 /** RETURN: an earlier held key comes back now, or on the next step of the BPM grid */
@@ -39,6 +39,8 @@ export class Instrument {
     this.trimGlide = 1 - Math.exp(-1 / (0.004 * fs));
     this.key = new Float32Array(128);
   }
+  /** SETTINGS: FRESH NOISE (each live hit's noise new) */
+  setSettings(st) { if (st) for (const en of this.engines) en.voice.freshNoise = !!st.freshNoise; }
   setEngines(n) { this.n = Math.max(1, Math.min(MAX_ENGINES, n | 0)); }
   setTempo(bpm, ret) { if (bpm) this.bpm = bpm; if (ret !== undefined) this.ret = ret; }
   /** a note on engine e: the sound's parameters, the velocity and the key's output (level, pan, send, trim).

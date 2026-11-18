@@ -16,6 +16,11 @@ No build step: serve the repo root with any static server and open `index.html`.
 
 The browser test needs a local server: `python3 -m http.server 8123`, then `node test/shots.mjs` (screenshots go to `local/shots/`).
 
+## Known differences
+
+- A loud snare whose tone, filtered noise and click together pass full scale is clipped there. The original wrapped round instead (an integer overflow), which gave a few snares a harsh crackle; that isn't copied (SPEC 5.11).
+- The filters are tuned an octave above the CUTOFF curve of SPEC 5.10: the compare test matches the reference best there (see `engine/filter.js`).
+
 ## Where it is
 
-Built in the steps of SPEC section 12. Done: the shell (1), kit import (2), the engine core (3): the control tick, the six waves, pitch, the amp envelope with CURVE and REPEAT, level, velocity and pan, and (4) the pitch envelope, snap, PHASE, mod A and B with one-sided FM. Still to come: noise, the filter, drive and crush (5), the clicks (6), modulation (7), then the effects (9) and the rest.
+Built in the steps of SPEC section 12. Done: the shell (1), kit import (2), the engine core (3): the control tick, the six waves, pitch, the amp envelope with CURVE and REPEAT, level, velocity and pan, (4) the pitch envelope, snap, PHASE, mod A and B with one-sided FM, and (5) noise, the filter, the routing of each kind, drive and crush. Still to come: the clicks (6), modulation (7), then the effects (9) and the rest.

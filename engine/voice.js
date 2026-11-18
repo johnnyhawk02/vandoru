@@ -1,13 +1,14 @@
 // The voice (SPEC section 5): one engine's sound, one note at a time. Pure JS, rate-agnostic: the envelopes count
 // control ticks of 64/44140 s on a clock of their own, whatever the audio rate.
 //
-// Built so far (build order steps 3 and 4): the tone with its six waves (band-limited) and the WAVE dial, its pitch
-// (TUNE, FINE), the pitch envelope, the snap and PHASE, mod A and mod B with one-sided FM, FM ENV and A MODE, the amp
-// envelope (ATTACK, DECAY, CURVE, REPEAT, glided in the drum kind, stepped in the others), LEVEL and velocity, and the
-// end of a sound. Noise, the generated clicks, filter, drive, crush and the modulation routes come in the next steps;
-// the voice runs as if they were at rest.
-import { TICK_S, noteHz, fineFactor, MOD_FINE, riseStep, decayStep, decayShape, attackShape, pCurveShape, pAmountDepth, clickRate, shape } from './curves.js?v=mwmdy8tl';
-import { TABLES, SINE, read, bandFor } from './waves.js?v=mwmdy8tl';
+// Built so far (build order steps 3 to 5): the tone with its six waves (band-limited) and the WAVE dial, its pitch
+// (TUNE, FINE), the pitch envelope, the snap and PHASE, mod A and mod B with one-sided FM, FM ENV and A MODE, noise,
+// the filter, the routing and finishing stage of each kind, drive and crush, the amp envelope (ATTACK, DECAY, CURVE,
+// REPEAT, glided in the drum kind, stepped in the others), LEVEL and velocity, and the end of a sound. The generated
+// clicks and the modulation routes come in the next steps; the voice runs as if they were at rest.
+import { TICK_S, noteHz, fineFactor, MOD_FINE, riseStep, decayStep, decayShape, attackShape, pCurveShape, pAmountDepth, clickRate, noiseHz, driveK, crushHz, shape } from './curves.js?v=mwme9jly';
+import { Filter } from './filter.js?v=mwme9jly';
+import { TABLES, SINE, read, bandFor } from './waves.js?v=mwme9jly';
 
 // the WAVE dial (SPEC 6.1), by position: sine 0, tri 25, saw 50, square 75, pwm 100, noise 125
 const STOPS = [0, 25, 50, 75, 100, 125];
@@ -53,15 +54,22 @@ export class Voice {
     this.fs = fs;
     this.spt = fs * TICK_S; // samples per control tick (64 at 44140 Hz)
     this.tone = new Osc(); this.modA = new Osc(); this.modB = new Osc();
-    this.rand = new Rand(); this.randA = new Rand(0x68e31da4); this.randB = new Rand(0xb5297a4d);
+    this.rand = new Rand(); this.randA = new Rand(); this.randB = new Rand(); this.randN = new Rand(); this.seed = new Rand(0x9e3779b9);
+    this.filter = new Filter(fs);
+    this.nph = 0; this.nheld = 0; // the noise part's sample-and-hold, running across notes (5.6)
+    this.crushC = 1; this.crushHeld = 0;
+    this.levelNow = 0; this.driveNow = -1 / 128; // the drum kind's smoothed LEVEL and DRIVE start from rest and carry across notes
     this.sound = null; this.active = false;
     this.freshNoise = false;
-    this.lvlGlide = 1 - Math.exp(-1 / (0.0023 * fs)); // LEVEL's smoothing, about 2.3 ms
+    this.lvlGlide = 1 - Math.exp(-1 / (0.0023 * fs)); // LEVEL's and DRIVE's smoothing in the drum kind, about 2.3 ms
   }
   /** a new note: the sound's parameters, the velocity (1..127) and LEVEL (0..127) */
   trigger(sound, vel, level, note = 60) {
     this.sound = sound; this.vel = vel; this.note = note;
     this.set(sound, level);
+    // the note's noise: from a fixed seed (offline renders repeat exactly), or new on every live hit (FRESH NOISE)
+    const seed = this.freshNoise ? this.seed.next() * 2147483647 + 2147483648 : 0x2545f491;
+    this.rand.s = seed >>> 0 || 1; this.randA.s = (seed ^ 0x68e31da4) >>> 0 || 1; this.randB.s = (seed ^ 0xb5297a4d) >>> 0 || 1; this.randN.s = (seed ^ 0x1b873593) >>> 0 || 1;
     // start phases (SPEC 5.4): the nearer wave's; PHASE moves the tone's back towards the cycle's start
     const near = (v) => { const [a, b, t] = dial(v); return t < 0.5 ? a : b; };
     const o = Math.round(sound.click) === 1 ? 1 - sound.clickVol / 127 : 1;
@@ -76,7 +84,7 @@ export class Voice {
     this.gain = 0; this.gStep = 0;
     this.tickAt = 0; // samples until the next tick: the first one at once
     this.quiet = 0; this.active = true;
-    this.levelNow = this.levelTo;
+    if (this.kind === 0) this.filter.reset(); // the drum kind clears its filter (5.10)
   }
   /** the sound's parameters changed (a knob turned while it rings) */
   set(sound, level) {
@@ -103,6 +111,14 @@ export class Voice {
     this.scA = FM_SCALE[this.wa]; this.scB = FM_SCALE[this.wb];
     // the tone's level: A MODE crossfades it towards the mixed-in A, NOISE towards the noise
     this.toneLevel = (1 - this.mix * this.aAmt) * (1 - sound.noise / 127);
+    // noise (5.6), the routing (5.11), drive (5.12) and crush (5.13)
+    this.nInc = noiseHz(sound.noiseRate) / this.fs; this.nMix = sound.noise / 127;
+    this.snarePath = this.kind === 1 && !sound.toneIn && sound.noiseIn && !sound.clickIn;
+    this.tIn = !!sound.toneIn; this.nIn = !!sound.noiseIn; this.cIn = !!sound.clickIn;
+    this.anyIn = this.tIn || this.nIn || this.cIn;
+    this.driveTo = sound.drive / 127 - 1 / 128;
+    this.crushOn = sound.crush < 127; this.crushInc = crushHz(sound.crush) / this.fs;
+    this.filter.set(sound.cutoff, sound.reso, sound.fltDrive, sound.type);
   }
   /** one control tick: the envelopes move, the oscillators pick their tables */
   tick() {
@@ -166,13 +182,34 @@ export class Voice {
       T = clip(T * this.toneLevel + A * this.mix);
       tone.ph += this.inc;
       if (tone.ph >= 1) { tone.ph -= Math.floor(tone.ph); tone.held = this.rand.next(); }
-      // routing and the finishing stage by kind (SPEC 5.11), with the parts built so far
-      let y = clip(T), g = this.gain;
+      // the noise: sample-and-hold at NOISE RATE, at 0.9
+      this.nph += this.nInc;
+      if (this.nph >= 1) { this.nph -= Math.floor(this.nph); this.nheld = this.randN.next(); }
+      const N0 = 0.9 * this.nheld, C = 0; // (the generated clicks come in step 6)
+      // routing and the finishing stage by kind (SPEC 5.11)
+      const g = this.gain;
       this.gain += this.gStep;
-      this.levelNow += (this.levelTo - this.levelNow) * this.lvlGlide;
-      if (this.kind === 0) y = clip(y * g * this.velG) * this.levelNow;
-      else y = clip(y * this.levelTo * this.velG * g);
-      out[i] = clip(y);
+      let y;
+      if (this.snarePath) {
+        y = T + this.filter.run(N0) * this.nMix + C;
+        y = clip(y * this.levelTo * this.velG * g);
+      } else {
+        const N = N0 * this.nMix;
+        let Y = 0;
+        if (this.anyIn) Y = this.filter.run(clip((this.tIn ? T : 0) + (this.cIn ? C : 0) + (this.nIn ? N : 0)));
+        Y = clip(Y + (this.tIn ? 0 : T) + (this.cIn ? 0 : C) + (this.nIn ? 0 : N));
+        if (this.kind === 0) y = clip(Y * g * this.velG);
+        else y = clip(Y * this.levelTo * this.velG * g);
+      }
+      // the drive: S(x, k), k = 2s/(1 - s); in the drum kind its amount glides, then LEVEL (glided)
+      let s0 = this.driveTo;
+      if (this.kind === 0) { this.driveNow += (this.driveTo - this.driveNow) * this.lvlGlide; s0 = this.driveNow; }
+      const kk = 2 * s0 / (1 - s0);
+      y = shape(y, kk);
+      if (this.kind === 0) { this.levelNow += (this.levelTo - this.levelNow) * this.lvlGlide; y *= this.levelNow; }
+      // the crush: sample-and-hold at its rate, no filtering
+      if (this.crushOn) { this.crushC += this.crushInc; if (this.crushC >= 1) { this.crushC -= Math.floor(this.crushC); this.crushHeld = y; } y = this.crushHeld; }
+      out[i] = y = clip(y);
       // the end of the sound: the envelope done and 50 ms under -90 dB
       if (this.stage === 'done') { if (y > 3e-5 || y < -3e-5) this.quiet = 0; else if (++this.quiet > 0.05 * fs) { this.active = false; out.fill(0, i + 1, n); return; } }
     }

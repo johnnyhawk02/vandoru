@@ -2,12 +2,12 @@
 // file is read (sound/kitfile.js), its sounds named and typed, and kept with its bytes and their hash (the same file
 // twice is one kit). The KITS menu lists them: hear a sound, put it on the key played last, deal a whole kit onto an
 // engine, change a sound's type, delete a kit.
-import { $ } from './widgets.js?v=mwmdy8tl';
-import { readKit, READER_VERSION, SLOT_NAMES } from '../sound/kitfile.js?v=mwmdy8tl';
-import { tidyParams, noteName } from '../sound/params.js?v=mwmdy8tl';
-import { guessType } from '../sound/types.js?v=mwmdy8tl';
-import { jumble } from './names.js?v=mwmdy8tl';
-import { TYPES, cleanLabel } from './patch.js?v=mwmdy8tl';
+import { $ } from './widgets.js?v=mwme9jly';
+import { readKit, READER_VERSION, SLOT_NAMES } from '../sound/kitfile.js?v=mwme9jly';
+import { tidyParams, noteName } from '../sound/params.js?v=mwme9jly';
+import { guessType } from '../sound/types.js?v=mwme9jly';
+import { jumble } from './names.js?v=mwme9jly';
+import { TYPES, cleanLabel } from './patch.js?v=mwme9jly';
 
 // the sounds a kit gives the app: the closed hat is decoded but not used (Johnny: open hats only)
 const USED = ['drum1', 'drum2', 'drum3', 'snare', 'metal', 'hatOpen'];

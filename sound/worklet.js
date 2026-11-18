@@ -1,6 +1,6 @@
 // The audio worklet: a thin host for the instrument (sound/instrument.js). Messages from the page play and edit the
 // engines; every few blocks it sends back the engines' peaks and the sidechain's envelope for the meters.
-import { Instrument } from './instrument.js?v=mwmdy8tl';
+import { Instrument } from './instrument.js?v=mwme9jly';
 
 class Host extends AudioWorkletProcessor {
   constructor() {
@@ -19,6 +19,7 @@ class Host extends AudioWorkletProcessor {
       case 'engines': I.setEngines(m.n); break;
       case 'tempo': I.setTempo(m.bpm, m.ret); break;
       case 'fx': I.setFx(m.fx); break;
+      case 'settings': I.setSettings(m.settings); break;
     }
   }
   process(inputs, outputs) {
