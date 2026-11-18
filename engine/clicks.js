@@ -2,7 +2,7 @@
 // start-up from the descriptions in the spec, never from recorded audio. Each is a sum of parts (a short pulse, tones
 // that may slide, band-limited noise), each part shaped by an envelope of [ms, dB] points, then the whole scaled so
 // its peak sits at 0.9 of full scale. Tuned by ear and against the reference pack's measurements of the originals.
-import { Rand } from './rand.js?v=mwmeexdh';
+import { Rand } from './rand.js?v=mwmeshlj';
 
 export const CLICK_FS = 44140;
 export const CLICK_MS = 50;

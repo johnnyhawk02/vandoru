@@ -1,8 +1,8 @@
 // The instrument: 1 to 6 mono engines, each playing one key's sound at a time, their mix, and the master (the
 // distortion, then the output level and a safety limiter). Pure JS, no DOM and no Web Audio: the worklet hosts it
 // for the speakers, and node runs it in the tests. The reverb send and the compressor come with step 9 (SPEC 7).
-import { Voice } from '../engine/voice.js?v=mwmeexdh';
-import { Dirt, DIRT_DEFAULTS } from './dirt.js?v=mwmeexdh';
+import { Voice } from '../engine/voice.js?v=mwmeshlj';
+import { Dirt, DIRT_DEFAULTS } from './dirt.js?v=mwmeshlj';
 
 export const MAX_ENGINES = 6;
 /** RETURN: an earlier held key comes back now, or on the next step of the BPM grid */
@@ -42,7 +42,7 @@ export class Instrument {
   /** SETTINGS: FRESH NOISE (each live hit's noise new) */
   setSettings(st) { if (st) for (const en of this.engines) en.voice.freshNoise = !!st.freshNoise; }
   setEngines(n) { this.n = Math.max(1, Math.min(MAX_ENGINES, n | 0)); }
-  setTempo(bpm, ret) { if (bpm) this.bpm = bpm; if (ret !== undefined) this.ret = ret; }
+  setTempo(bpm, ret) { if (bpm) { this.bpm = bpm; for (const en of this.engines) en.voice.bpm = bpm; } if (ret !== undefined) this.ret = ret; }
   /** a note on engine e: the sound's parameters, the velocity and the key's output (level, pan, send, trim).
    *  back: the zone returning to an earlier held key, on the next step of the RETURN grid */
   play(e, sound, vel, out, back = false) {
@@ -56,11 +56,11 @@ export class Instrument {
   start(en) {
     const { sound, vel, out } = en.pending; en.pending = null;
     en.out = { ...out };
-    // pan is latched at the note's start (SPEC 5.14)
-    const p = Math.min(127, Math.max(0, out.pan));
-    en.gL = Math.sqrt((127 - p) / 127); en.gR = Math.sqrt(p / 127);
     en.trimTo = Math.pow(10, (out.trim || 0) / 20); if (!en.voice.active) en.trim = en.trimTo;
     en.voice.trigger(sound, vel, out.level);
+    // pan is latched at the note's start, where an LFO or velocity aimed at PAN puts it (SPEC 5.14)
+    const p = Math.min(127, Math.max(0, en.voice.panFor(out.pan)));
+    en.gL = Math.sqrt((127 - p) / 127); en.gR = Math.sqrt(p / 127);
   }
   /** the ringing sound edited: heard on what's still sounding */
   update(e, sound, out) {
