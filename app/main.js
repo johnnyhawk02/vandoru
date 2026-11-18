@@ -1,14 +1,14 @@
 // VANDORU: the page. 25 keys on MIDI channel 1, split between 1 to 6 mono engines; every key has its own sound, and
 // the knobs edit the key played last. The sound engine is in engine/ and sound/ (no UI there); this file holds the
 // state, the keys, MIDI, the knob grid, the randomisers, undo, presets, the FX + MASTER tab and the phone view.
-import { $, clamp, dragger, hbar, knob, switchCell, LOCK_SVG, DICE_SVG, makeDice } from './widgets.js?v=mwmdihvu';
-import { setupColours } from './colours.js?v=mwmdihvu';
-import { presetName, jumble } from './names.js?v=mwmdihvu';
-import { PARAMS, PARAM, OUT_PARAMS, GRID_ROWS, GRID_COLS, cells, TARGETS, targetLabel, showValue, noteName, dialAt } from '../sound/params.js?v=mwmdihvu';
-import { MAX_ENGINES, RETURNS, fxDefaults } from '../sound/instrument.js?v=mwmdihvu';
-import { DIRT_DEFAULTS, dirtHz, scHz, decayMs, volDb, pregainDb, bassDb } from '../sound/dirt.js?v=mwmdihvu';
-import { setupKits } from './kits.js?v=mwmdihvu';
-import { KEYS, DEFAULT_ENGINES, DEFAULT_LOW, TYPES, zones, engineOf, tidySound, newKey, tidyKey, tidyPatch, tidyFx, cleanName, canon, copySound } from './patch.js?v=mwmdihvu';
+import { $, clamp, dragger, hbar, knob, switchCell, LOCK_SVG, DICE_SVG, makeDice } from './widgets.js?v=mwmdta0r';
+import { setupColours } from './colours.js?v=mwmdta0r';
+import { presetName, jumble } from './names.js?v=mwmdta0r';
+import { PARAMS, PARAM, OUT_PARAMS, GRID_ROWS, GRID_COLS, cells, TARGETS, targetLabel, showValue, noteName, dialAt } from '../sound/params.js?v=mwmdta0r';
+import { MAX_ENGINES, RETURNS, fxDefaults } from '../sound/instrument.js?v=mwmdta0r';
+import { DIRT_DEFAULTS, dirtHz, scHz, decayMs, volDb, pregainDb, bassDb } from '../sound/dirt.js?v=mwmdta0r';
+import { setupKits } from './kits.js?v=mwmdta0r';
+import { KEYS, DEFAULT_ENGINES, DEFAULT_LOW, TYPES, zones, engineOf, tidySound, newKey, tidyKey, tidyPatch, tidyFx, cleanName, canon, copySound } from './patch.js?v=mwmdta0r';
 
 const STORE = 'vandoru-v1', PRESET_STORE = 'vandoru-presets-v1';
 const engName = (e) => `ENGINE ${e + 1}`;
@@ -17,7 +17,7 @@ const say = (html) => { $('detail').innerHTML = html; };
 // ---------------------------------------------------------------------------------------------------------------
 // the library: the starter set (hand-made, SPEC 8.6) and, from step 2, the imported kits' sounds
 // ---------------------------------------------------------------------------------------------------------------
-const STARTER = (await (await fetch(new URL('../sounds/starter.json?v=mwmdihvu', import.meta.url))).json()).map(tidySound);
+const STARTER = (await (await fetch(new URL('../sounds/starter.json?v=mwmdta0r', import.meta.url))).json()).map(tidySound);
 const starterOf = (type) => STARTER.find((s) => s.type === type) || STARTER[0];
 let kits = { library: () => [], close() {} }; // the imported kits (the KITS menu, set up below)
 const library = () => [...STARTER, ...kits.library()];
@@ -88,7 +88,7 @@ const send = (m) => { if (node) node.port.postMessage(m); };
 async function startAudio() {
   if (ctx) { if (ctx.state !== 'running') await ctx.resume(); return; }
   ctx = new AudioContext({ latencyHint: 'interactive' });
-  await ctx.audioWorklet.addModule(new URL('../sound/worklet.js?v=mwmdihvu', import.meta.url));
+  await ctx.audioWorklet.addModule(new URL('../sound/worklet.js?v=mwmdta0r', import.meta.url));
   node = new AudioWorkletNode(ctx, 'vandoru', { numberOfInputs: 0, outputChannelCount: [2] });
   node.port.onmessage = (e) => { if (e.data.type === 'peaks') { showPeaks(e.data.peaks); showSc(e.data.sc || 0); } };
   node.connect(ctx.destination);
@@ -512,6 +512,7 @@ function deal(p, sound) {
   const k = S.keys[p], e = engineOfKey(p), L = S.locks[e], s = copySound(sound);
   for (const id of L) if (PARAM[id]) s.params[id] = k.sound.params[id];
   k.sound = s; k.edits = {}; k.home = null; k.out.trim = 0;
+  if (s.level != null && !L.includes('level')) k.out.level = s.level;
   if (!L.includes('pan')) k.out.pan = panFor(s.type);
 }
 const newSound = (not) => { const lib = library(); let s; do s = pick(lib); while (lib.length > 1 && s.name === not); return s; };

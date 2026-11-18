@@ -4,8 +4,9 @@
   "type": "module",
   "description": "A percussion instrument for the browser that plays drum kits in the SND kit format",
   "scripts": {
-    "test": "node test/names-clean.test.mjs && node test/names.test.mjs && node test/curves.test.mjs && node test/kitfile.test.mjs && node test/dirt.test.mjs",
+    "test": "node test/names-clean.test.mjs && node test/names.test.mjs && node test/curves.test.mjs && node test/kitfile.test.mjs && node test/engine.test.mjs && node test/dirt.test.mjs",
     "shots": "node test/shots.mjs",
+    "compare": "node test/compare.mjs",
     "stamp": "node tools/stamp.mjs"
   }
 }
