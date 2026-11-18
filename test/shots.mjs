@@ -14,9 +14,23 @@ let errors = 0;
 const J = JSON.stringify;
 const bad = (what, ...x) => { errors++; console.log('FAIL', what, J(x).slice(0, 600)); };
 
+// the sound itself: the audio worklet must start and its engines must play. Its peaks are watched from outside
+const probe = (p) => p.addInitScript(() => {
+  window.__heard = 0; window.__workletError = null;
+  const W = window.AudioWorkletNode;
+  window.AudioWorkletNode = class extends W {
+    constructor(...a) {
+      super(...a);
+      this.addEventListener('processorerror', (e) => { window.__workletError = e.message || 'processor error'; });
+      this.port.addEventListener('message', (e) => { if (e.data && e.data.peaks) window.__heard = Math.max(window.__heard, ...e.data.peaks); });
+    }
+  };
+});
+const heard = async (p, what) => { const h = await p.evaluate(() => [window.__heard, window.__workletError]); if (!(h[0] > 0.01) || h[1]) bad(`${what} no sound`, h); };
+
 for (const [w, h] of [[1440, 900], [1280, 800], [1440, 760], [1280, 700]]) {
   const p = await b.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: 1, acceptDownloads: true });
-  p.on('pageerror', (e) => bad(`${w}x${h} page error`, e.message));
+  p.on('pageerror', (e) => bad(`${w}x${h} page error`, e.message)); await probe(p);
   p.on('console', (m) => { if (m.type() === 'error') bad(`${w}x${h} console`, m.text()); });
   const turn = async (el, up, dy = 14) => { const r = await el.boundingBox(), x = r.x + r.width / 2, y = r.y + r.height / 2;
     await p.mouse.move(x, y); await p.mouse.down(); for (let i = 1; i <= 4; i++) await p.mouse.move(x, y + (up ? -1 : 1) * dy * i / 4); await p.mouse.up(); };
@@ -25,6 +39,7 @@ for (const [w, h] of [[1440, 900], [1280, 800], [1440, 760], [1280, 700]]) {
   await p.click('#start-btn'); await p.waitForTimeout(300);
   for (const n of [50, 60, 70]) { await p.evaluate((n) => window.app.noteOn(1, n, 110), n); await p.waitForTimeout(60); }
   await p.evaluate(() => window.app.noteOn(1, 49, 100)); await p.waitForTimeout(100);
+  await heard(p, `${w}x${h}`);
 
   // the layout: nothing scrolls, the screen is inside the window, every knob on the columns of the first row
   const lay = await p.evaluate(() => {
@@ -158,7 +173,7 @@ for (const [w, h] of [[1440, 900], [1280, 800], [1440, 760], [1280, 700]]) {
 for (const [w, h] of [[412, 915], [412, 780], [360, 640]]) {
   const cx = await b.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
   const p = await cx.newPage(), cdp = await cx.newCDPSession(p);
-  p.on('pageerror', (e) => bad(`phone ${w}x${h} page error`, e.message));
+  p.on('pageerror', (e) => bad(`phone ${w}x${h} page error`, e.message)); await probe(p);
   await p.goto(url); await p.waitForFunction(() => window.appReady); await p.waitForTimeout(300);
   const lay = await p.evaluate(() => { const r = (e) => e.getBoundingClientRect(), pads = [...document.querySelectorAll('#pv-pads .pad')], xs = [...new Set(pads.map((e) => Math.round(r(e).left)))];
     return { phone: document.documentElement.classList.contains('phone'), pads: pads.length, cols: xs.length, small: pads.filter((e) => r(e).width < 44 || r(e).height < 44).length,
@@ -173,6 +188,7 @@ for (const [w, h] of [[412, 915], [412, 780], [360, 640]]) {
   const two = await p.evaluate(() => [document.querySelectorAll('.pad.down').length, window.app.place()]);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await p.waitForTimeout(150);
   const none = await p.evaluate(() => document.querySelectorAll('.pad.down').length);
+  await heard(p, `phone ${w}x${h}`);
   if (two[0] !== 2 || two[1] !== 20 || none !== 0) bad(`phone ${w}x${h} two fingers`, two, none);
   const name = () => p.evaluate(() => window.app.state().keys[window.app.place()].sound.name);
   const n0 = await name(); await p.tap('#pv-dice'); await p.waitForTimeout(200); const n1 = await name();
