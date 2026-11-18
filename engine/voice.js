@@ -1,14 +1,16 @@
 // The voice (SPEC section 5): one engine's sound, one note at a time. Pure JS, rate-agnostic: the envelopes count
 // control ticks of 64/44140 s on a clock of their own, whatever the audio rate.
 //
-// Built so far (build order steps 3 to 5): the tone with its six waves (band-limited) and the WAVE dial, its pitch
+// Built so far (build order steps 3 to 6): the tone with its six waves (band-limited) and the WAVE dial, its pitch
 // (TUNE, FINE), the pitch envelope, the snap and PHASE, mod A and mod B with one-sided FM, FM ENV and A MODE, noise,
 // the filter, the routing and finishing stage of each kind, drive and crush, the amp envelope (ATTACK, DECAY, CURVE,
-// REPEAT, glided in the drum kind, stepped in the others), LEVEL and velocity, and the end of a sound. The generated
-// clicks and the modulation routes come in the next steps; the voice runs as if they were at rest.
-import { TICK_S, noteHz, fineFactor, MOD_FINE, riseStep, decayStep, decayShape, attackShape, pCurveShape, pAmountDepth, clickRate, noiseHz, driveK, crushHz, shape } from './curves.js?v=mwme9jly';
-import { Filter } from './filter.js?v=mwme9jly';
-import { TABLES, SINE, read, bandFor } from './waves.js?v=mwme9jly';
+// REPEAT, glided in the drum kind, stepped in the others), LEVEL and velocity, the twelve generated clicks, and the end
+// of a sound. The modulation routes come in step 7; the voice runs as if they were at rest.
+import { TICK_S, noteHz, fineFactor, MOD_FINE, riseStep, decayStep, decayShape, attackShape, pCurveShape, pAmountDepth, clickRate, noiseHz, driveK, crushHz, shape } from './curves.js?v=mwmeexdh';
+import { Rand } from './rand.js?v=mwmeexdh';
+import { CLICKS, CLICK_FS } from './clicks.js?v=mwmeexdh';
+import { Filter } from './filter.js?v=mwmeexdh';
+import { TABLES, SINE, read, bandFor } from './waves.js?v=mwmeexdh';
 
 // the WAVE dial (SPEC 6.1), by position: sine 0, tri 25, saw 50, square 75, pwm 100, noise 125
 const STOPS = [0, 25, 50, 75, 100, 125];
@@ -20,11 +22,7 @@ function dial(v) {
 }
 const clip = (x) => (x > 1 ? 1 : x < -1 ? -1 : x);
 
-/** a small, fast, seedable noise source: uniform in [-1, 1) */
-export class Rand {
-  constructor(seed = 0x2545f491) { this.s = seed >>> 0 || 1; }
-  next() { let s = this.s; s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; this.s = s; return s / 2147483648 - 1; }
-}
+export { Rand };
 
 /** an oscillator: one phase counter, the dial's one or two waves read at it */
 class Osc {
@@ -77,6 +75,7 @@ export class Voice {
     this.modA.ph = this.kind === 0 ? START[near(sound.aWave)] : 0; this.modA.held = this.randA.next();
     this.modB.ph = 0; this.modB.held = this.randB.next();
     this.u = 1; this.k = 1; // the pitch envelope and the snap
+    this.cpos = 0; // the generated click plays from its start
     // the amp envelope (SPEC 5.9): REPEAT skips the attack
     this.reps = Math.round(sound.repeat);
     this.stage = this.reps > 0 ? 'rep' : 'att';
@@ -100,6 +99,10 @@ export class Voice {
     // the pitch envelope (5.8) and the snap (5.7)
     this.P = pAmountDepth(sound.pAmount); this.pStep = riseStep(sound.pDecay); this.pShape = pCurveShape(sound.pCurve);
     this.snap = Math.round(sound.click) === 0 ? sound.clickVol / 127 : 0; this.snapStep = 0.2 * clickRate(sound.clickRate);
+    // a generated click (CLICK 2..13): played at CLICK RATE, at CLICK VOL
+    const cn = Math.round(sound.click);
+    this.clickBuf = cn >= 2 && sound.clickVol > 0 ? CLICKS[cn] : null;
+    this.clickVol = sound.clickVol / 127; this.cInc = clickRate(sound.clickRate) * CLICK_FS / this.fs;
     // mod A and mod B (5.5)
     this.aAmt = sound.aAmount / 127; this.bAmt = sound.bAmount / 127;
     this.aOn = this.aAmt > 0; this.bOn = this.bAmt > 0;
@@ -185,7 +188,12 @@ export class Voice {
       // the noise: sample-and-hold at NOISE RATE, at 0.9
       this.nph += this.nInc;
       if (this.nph >= 1) { this.nph -= Math.floor(this.nph); this.nheld = this.randN.next(); }
-      const N0 = 0.9 * this.nheld, C = 0; // (the generated clicks come in step 6)
+      const N0 = 0.9 * this.nheld;
+      let C = 0;
+      if (this.clickBuf) {
+        const b = this.clickBuf, j = this.cpos | 0;
+        if (j < b.length - 1) { const f = this.cpos - j; C = (b[j] + (b[j + 1] - b[j]) * f) * this.clickVol; this.cpos += this.cInc; }
+      }
       // routing and the finishing stage by kind (SPEC 5.11)
       const g = this.gain;
       this.gain += this.gStep;

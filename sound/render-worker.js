@@ -1,5 +1,5 @@
 // A Worker for offline renders, off the page's thread: { id, sound, level, vel, seconds, fs } in, { id, samples } out.
-import { renderSound } from '../engine/render.js?v=mwme9jly';
+import { renderSound } from '../engine/render.js?v=mwmeexdh';
 
 self.onmessage = (e) => {
   const { id, sound, level, vel, seconds, fs } = e.data;
