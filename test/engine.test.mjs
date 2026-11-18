@@ -3,6 +3,8 @@
 import { renderSound } from '../engine/render.js';
 import { defaultParams } from '../sound/params.js';
 import { TABLES, BANDS } from '../engine/waves.js';
+import { CLICKS, makeClick } from '../engine/clicks.js';
+import { Voice } from '../engine/voice.js';
 let fails = 0, checks = 0;
 const ok = (c, m) => { checks++; if (!c) { fails++; console.log('FAIL', m); } };
 const snd = (o) => ({ ...defaultParams(), cutoff: 127, type: 126, ...o });
@@ -94,6 +96,16 @@ for (const [wave, scale, tbl] of [[0, 1, null], [50, 4, 'saw']]) {
 // crush: CRUSH 0 holds the first sample for ever; CRUSH 64 holds each sample for several
 { const x = renderSound(snd({ wave: 50, tune: 60, crush: 64, type: 126, kind: 'metal', velVol: false, decay: 127 }), { seconds: 0.05 });
   let same = 0; for (let i = 1; i < x.length; i++) if (x[i] === x[i - 1]) same++; ok(same / x.length > 0.75, `CRUSH 64 holds samples: ${(same / x.length).toFixed(2)}`); }
+
+// the generated clicks (SPEC 5.7): twelve, each 50 ms, peaking at 0.9, made the same way every time; CLICK RATE
+// 0.25x makes one four times as long
+for (let n = 2; n <= 13; n++) {
+  const c = CLICKS[n], pk = Math.max(...c.map(Math.abs)), again = makeClick(n);
+  ok(c.length === 2207 && Math.abs(pk - 0.9) < 1e-6 && c.every((v, i) => v === again[i]), `click ${n}: 50 ms, peak ${pk.toFixed(3)}, repeatable`);
+}
+{ const v = new Voice(48000); v.trigger(snd({ click: 7, clickVol: 127, clickRate: 0 }), 100, 127);
+  const w = new Voice(48000); w.trigger(snd({ click: 7, clickVol: 127, clickRate: 127 }), 100, 127);
+  ok(Math.abs(v.cInc - 0.25 * 44140 / 48000) < 1e-9 && Math.abs(w.cInc / v.cInc - (0.25 + 127 / 33.9) / 0.25) < 1e-9, 'CLICK RATE plays a click from 0.25x to 4x'); }
 
 // repeatability: the same render twice is identical
 { const s = snd({ wave: 125, decay: 40 }), a = renderSound(s), b = renderSound(s); ok(a.every((v, i) => v === b[i]), 'renders repeat exactly'); }
