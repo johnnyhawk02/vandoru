@@ -1,8 +1,8 @@
 // The instrument: 1 to 6 mono engines, each playing one key's sound at a time, their mix, and the master (the
 // distortion, then the output level and a safety limiter). Pure JS, no DOM and no Web Audio: the worklet hosts it
 // for the speakers, and node runs it in the tests. The reverb send and the compressor come with step 9 (SPEC 7).
-import { Voice } from '../engine/voice.js?v=mwmeshlj';
-import { Dirt, DIRT_DEFAULTS } from './dirt.js?v=mwmeshlj';
+import { Voice } from '../engine/voice.js?v=mwmh7ohg';
+import { Dirt, DIRT_DEFAULTS } from './dirt.js?v=mwmh7ohg';
 
 export const MAX_ENGINES = 6;
 /** RETURN: an earlier held key comes back now, or on the next step of the BPM grid */

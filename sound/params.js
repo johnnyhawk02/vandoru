@@ -2,7 +2,8 @@
 // engine has every one of them. Values are the kit's units, 0..127 (a dial or a morph may hold a fraction); switches
 // are true/false, the two modulation targets a parameter id or null, KIND 'drum', 'snare' or 'metal'.
 import { noteHz, fineFactor, attackS, decayS, pDecayS, cutoffHz, noiseHz, crushHz, clickRate, lfoHz, pAmountDepth,
-  SYNC_NAMES } from '../engine/curves.js?v=mwmeshlj';
+  SYNC_NAMES } from '../engine/curves.js?v=mwmh7ohg';
+import { TUNE } from '../engine/filter.js?v=mwmh7ohg';
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 /** a note number as a name (C3 = 60) */
@@ -63,7 +64,7 @@ export const PARAMS = [
   P('toneIn', 'TONE IN', 'filter in', true, 'switch'),
   P('noiseIn', 'NOISE IN', 'filter in', true, 'switch'),
   P('clickIn', 'CLICK IN', 'filter in', true, 'switch'),
-  P('cutoff', 'CUTOFF', 'filter', 127, 'knob', { show: (v) => hz(cutoffHz(v)) }),
+  P('cutoff', 'CUTOFF', 'filter', 127, 'knob', { show: (v) => hz(cutoffHz(v) * TUNE) }), // the frequency the filter really runs at (engine/filter.js)
   P('reso', 'RESO', 'filter', 0),
   P('type', 'TYPE', 'filter', 0, 'dial', { stops: TYPES }),
   P('fltDrive', 'FLT DRIVE', 'filter', 0),

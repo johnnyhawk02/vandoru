@@ -1,5 +1,5 @@
 // A kit sound's type (SPEC 8.3) from its slot and its numbers. A pure function: no DOM, no storage.
-import { noteHz, fineFactor, pAmountDepth, riseStep, decayS, pCurveShape, shape, TICK_S } from '../engine/curves.js?v=mwmeshlj';
+import { noteHz, fineFactor, pAmountDepth, riseStep, decayS, pCurveShape, shape, TICK_S } from '../engine/curves.js?v=mwmh7ohg';
 
 /** a first guess at a kit sound's type from its slot and its numbers (SPEC 8.3). The measured version (a render at
  *  velocity 100: the pitch at 30 ms, the length, the noisiness) comes with auto level in step 10 */

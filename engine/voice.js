@@ -6,12 +6,12 @@
 // the filter, the routing and finishing stage of each kind, drive and crush, the amp envelope (ATTACK, DECAY, CURVE,
 // REPEAT, glided in the drum kind, stepped in the others), LEVEL and velocity, the twelve generated clicks, and the end
 // of a sound, and the modulation routes: velocity and the LFO, each aimed at one of the sound's own parameters.
-import { TICK_S, noteHz, fineFactor, MOD_FINE, riseStep, decayStep, decayShape, attackShape, pCurveShape, pAmountDepth, clickRate, noiseHz, driveK, crushHz, shape } from './curves.js?v=mwmeshlj';
-import { Rand } from './rand.js?v=mwmeshlj';
-import { moved, lfoWave, lfoStep } from './mod.js?v=mwmeshlj';
-import { CLICKS, CLICK_FS } from './clicks.js?v=mwmeshlj';
-import { Filter } from './filter.js?v=mwmeshlj';
-import { TABLES, SINE, read, bandFor } from './waves.js?v=mwmeshlj';
+import { TICK_S, noteHz, fineFactor, MOD_FINE, riseStep, decayStep, decayShape, attackShape, pCurveShape, pAmountDepth, clickRate, noiseHz, driveK, crushHz, shape } from './curves.js?v=mwmh7ohg';
+import { Rand } from './rand.js?v=mwmh7ohg';
+import { moved, lfoWave, lfoStep } from './mod.js?v=mwmh7ohg';
+import { CLICKS, CLICK_FS } from './clicks.js?v=mwmh7ohg';
+import { Filter } from './filter.js?v=mwmh7ohg';
+import { TABLES, SINE, read, bandFor } from './waves.js?v=mwmh7ohg';
 
 // the WAVE dial (SPEC 6.1), by position: sine 0, tri 25, saw 50, square 75, pwm 100, noise 125
 const STOPS = [0, 25, 50, 75, 100, 125];
