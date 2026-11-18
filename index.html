@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VANDORU</title>
+<meta name="description" content="A percussion instrument for a 25-key keyboard: import drum kits in the SND kit format and play every sound in them, every key its own sound.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&display=swap">
+<link rel="stylesheet" href="css/lcd.css?v=mwmd7iyd">
+<script>
+// a phone held upright gets the phone view from the first paint, before the wide screen can make the browser zoom out
+// (app/main.js keeps it in step after that). ?phone asks for it anywhere, ?desktop for the big screen on a phone
+(function () {
+  var q = location.search, small = Math.min(screen.width, screen.height) <= 700 || innerWidth <= 700;
+  if (!/[?&]desktop\b/.test(q) && (/[?&]phone\b/.test(q) || (small && innerHeight > innerWidth))) document.documentElement.classList.add('phone');
+  // the screen's colours (SETTINGS > SCREEN COLOURS), before the first paint; app/colours.js does the same
+  try { var c = JSON.parse(localStorage.getItem('vandoru-colours')); if (c && c.panel && c.ink) {
+    var rgb = function (h) { return [1, 3, 5].map(function (i) { return parseInt(h.substr(i, 2), 16); }); }, p = rgb(c.panel), s = document.documentElement.style;
+    var dark = (0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]) / 255 < 0.4;
+    s.setProperty('--panel-rgb', p.join(' ')); s.setProperty('--ink-rgb', rgb(c.ink).join(' ')); s.setProperty('--shade-rgb', dark ? '0 0 0' : 'var(--ink-rgb)'); s.setProperty('--glow', dark ? 0 : 1);
+  } } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<main class="screen" id="screen">
+  <header class="top">
+    <h1 class="logo">VANDORU</h1>
+    <div class="menu" id="pmenu">
+      <button class="btn pbtn" id="preset-btn" aria-haspopup="true" aria-expanded="false"><span class="dim">PRESET</span><b id="preset-name"></b><i id="preset-mark"></i><span>▾</span></button>
+      <div class="menupanel pleft" id="preset-panel" hidden>
+        <h3>THIS PATCH <span class="dim" id="preset-state"></span></h3>
+        <div class="randrow">
+          <input class="pname" id="preset-input" type="text" maxlength="18" spellcheck="false" autocomplete="off" aria-label="The patch's name" title="The patch's name: type one, or press NEW NAME for another made-up one">
+          <button class="btn" id="preset-roll" title="Another name, jumbled out of pieces of words">NEW NAME</button>
+        </div>
+        <div class="randrow">
+          <button class="btn" id="preset-save" title="Keep this patch under its name: every key, the engines, the effects, the master and the BPM. Saved again, it replaces the saved one">SAVE</button>
+          <button class="btn" id="preset-save-new" title="Keep this patch as another preset, under a new name; the one it came from stays as it was saved">SAVE AS NEW</button>
+          <button class="btn" id="preset-revert" title="Go back to this preset as it was saved (UNDO brings your changes back)">REVERT</button>
+        </div>
+        <h3>SAVED <span class="dim" id="preset-count"></span></h3>
+        <div class="plist" id="preset-list"></div>
+        <h3>FILE</h3>
+        <div class="randrow">
+          <button class="btn" id="preset-export" title="Write every saved preset to a file on this computer">EXPORT</button>
+          <button class="btn" id="preset-import" title="Read presets from an exported file and add them to the list">IMPORT</button>
+          <input type="file" id="preset-file" accept=".json,application/json" hidden>
+        </div>
+      </div>
+    </div>
+    <div class="lcdbox midi" id="midi-status" title="Web MIDI input">MIDI: off</div>
+    <div class="lcdbox last" id="last" aria-live="polite"><span class="dim">LAST</span> <b id="last-text">nothing played yet</b></div>
+    <div class="menu" id="smenu">
+      <button class="btn" id="settings-btn" aria-haspopup="true" aria-expanded="false" title="Tempo, how held keys come back, the keyboard's layout, the screen's colours and the hardware knobs">SETTINGS ▾</button>
+      <div class="menupanel settings" id="settings-panel" hidden>
+        <h3>TEMPO</h3>
+        <div class="lowkey" role="group" aria-label="Tempo"><span class="dim">BPM</span><button class="btn sm" id="bpm-down" title="Slower (Shift: by 10)">−</button><b class="lcdbox bpm" id="bpm" title="The tempo: − and + change it (Shift: by 10), double-click for 120">120</b><button class="btn sm" id="bpm-up" title="Faster (Shift: by 10)">+</button></div>
+        <p class="dim note">FOR RETURN AND THE SYNCED LFOS: − AND + (SHIFT: BY 10), DOUBLE-CLICK THE NUMBER FOR 120</p>
+        <div class="lowkey" role="group" aria-label="Return timing"><span class="dim">RETURN</span><button class="btn sm ret" id="ret" title="Each engine plays one key at a time, the newest. Let go of it while an earlier key of the zone is still held and that key comes back: at once, or on the next step of the BPM grid. Click to change (Shift: back)">1/16</button></div>
+        <p class="dim note">A HELD KEY COMING BACK WHEN A NEWER ONE IS LET GO: AT ONCE (NOW), OR ON THE NEXT STEP OF THE BPM</p>
+        <h3>KEYBOARD</h3>
+        <div class="lowkey" role="group" aria-label="How many engines share the keys"><span class="dim">ENGINES</span><button class="btn sm" id="eng-down" title="One engine fewer: the keys split into fewer, wider zones">−</button><b class="lcdbox" id="engines">3</b><button class="btn sm" id="eng-up" title="One engine more (up to 6): each plays one key at a time on its own zone">+</button></div>
+        <div class="lowkey" role="group" aria-label="Lowest key of the layout"><span class="dim">LOW KEY</span><button class="btn sm" id="low-down" title="Move the whole layout down an octave">−</button><b class="lcdbox" id="low-key"></b><button class="btn sm" id="low-up" title="Move the whole layout up an octave">+</button></div>
+        <p class="dim note">THE LOWEST KEY OF THE LAYOUT: − AND + MOVE IT BY AN OCTAVE</p>
+        <h3>PLAYING</h3>
+        <label class="chk" title="Every live hit gets noise of its own, as the hardware did. Off: every hit plays the same noise, as the offline renders do"><input type="checkbox" id="fresh-noise"><i></i>FRESH NOISE <span class="dim">EACH HIT'S NOISE NEW</span></label>
+        <label class="chk" title="A new note on a sounding engine fades the old one out over 1 ms instead of restarting it hard"><input type="checkbox" id="soft-retrig"><i></i>SOFT RETRIGGER <span class="dim">1 MS FADE ON A NEW NOTE</span></label>
+        <h3>SCREEN COLOURS</h3>
+        <div class="randrow themes" id="themes"></div>
+        <div class="lowkey colour"><span class="dim">PANEL</span><input type="color" id="col-panel" aria-label="The screen's background colour" title="The screen's background colour"></div>
+        <div class="lowkey colour"><span class="dim">TEXT</span><input type="color" id="col-ink" aria-label="The colour of the text, knobs and lines" title="The colour of the text, knobs and lines"></div>
+        <div class="lowkey colour"><span class="dim"></span><button class="btn" id="col-reset" title="Back to the green LCD">RESET</button></div>
+        <p class="dim note">A LOOK FROM ABOVE, OR YOUR OWN TWO COLOURS: KEPT IN THIS BROWSER, NOT IN PRESETS</p>
+        <h3>HARDWARE KNOBS</h3>
+        <div class="randrow">
+          <button class="btn" id="learn" title="Map a knob: press, click a control on screen, turn the knob">LEARN</button>
+          <button class="btn" id="cc-reset" title="Knobs back to the Bass Station 2 map">BS2 MAP</button>
+          <span class="dim note">LEARN: PRESS, CLICK A CONTROL ON SCREEN, TURN A KNOB</span>
+        </div>
+      </div>
+    </div>
+    <div class="menu" id="menu">
+      <button class="btn" id="menu-btn" aria-haspopup="true" aria-expanded="false" title="A new patch, new sounds or a nudge for a whole engine or all of them, and how much">RANDOM ▾</button>
+      <div class="menupanel" id="menu-panel" hidden>
+        <h3>NEW PATCH</h3>
+        <div class="randrow">
+          <button class="btn" id="init-patch" title="A new patch: every key gets a fresh sound, panned as RANDOM ALL deals them, and 30% of the keys a reverb send. Locked keys and hand edits are replaced; a knob with a closed padlock keeps its setting on every key. BPM goes back to 120 and the effects and output level to their starting settings; RETURN, the engine levels and the padlocks stay. UNDO takes it all back">INIT PATCH</button>
+          <span class="dim note" id="init-info"></span>
+        </div>
+        <h3>THIS ENGINE <span class="dim" id="rand-name">ENGINE 1</span></h3>
+        <div class="randrow">
+          <button class="btn" id="scatter" title="Every key of this engine gets a new sound. Locked keys stay, and so does every knob with a closed padlock">RANDOM</button>
+          <button class="btn" id="alter" title="Nudge every key of this engine around what it plays now, by the HOW MUCH amount. Locked keys stay, and so does every knob with a closed padlock">ALTER</button>
+          <span class="dim cap">NEW SOUND<br>ON EVERY KEY</span><span class="dim cap">NUDGE THE SOUNDS<br>THE KEYS HAVE</span>
+        </div>
+        <h3>ALL ENGINES</h3>
+        <div class="randrow">
+          <button class="btn" id="kit-scatter" title="Every key of every engine gets a new sound. Locked keys stay, and so does every knob with a closed padlock">RANDOM ALL</button>
+          <button class="btn" id="kit-alter" title="Nudge every key of every engine around what it plays now, by the HOW MUCH amount. Locked keys stay, and so does every knob with a closed padlock">ALTER ALL</button>
+          <span class="dim cap wide">THE SAME, FOR ALL 25 KEYS</span>
+        </div>
+        <h3>HOW MUCH</h3>
+        <div class="bars" id="rand-bars" title="How far ALTER, ALTER ALL and ALTER KEY move each control"></div>
+        <label class="chk wild" title="ALTER may take a control anywhere in its range, not only where its kind of sound usually sits"><input type="checkbox" id="wild"><i></i>WILD <span class="dim">ALTER GOES ANYWHERE</span></label>
+        <h3>KNOB PADLOCKS <span class="dim" id="lock-count">NONE LOCKED</span></h3>
+        <div class="randrow">
+          <button class="btn sm" id="lock-none" title="Open every knob's padlock, on all engines">UNLOCK ALL</button>
+          <span class="dim note">A LOCKED KNOB KEEPS ITS SETTING ON EVERY KEY OF ITS ENGINE, WHATEVER YOU PRESS HERE</span>
+        </div>
+      </div>
+    </div>
+    <button class="btn" id="undo" disabled title="Take back the last change to the sounds (Z, or Cmd+Z / Ctrl+Z); press again to go further back">UNDO<kbd>Z</kbd></button>
+  </header>
+
+  <div class="main">
+  <div class="left">
+  <section class="keyhead" id="keyhead" aria-label="The key">
+    <div class="keyname"><span class="dim">KEY</span><b id="kh-note">C3</b><span class="dim" id="kh-num">#60</span></div>
+    <div class="keyinfo"><b id="kh-engine">ENGINE 1</b><span id="kh-info"></span></div>
+    <div class="keystrip" id="keystrip" title="Click a key to pick it and hear it ([ and ] step to the next key, Space plays it again)"></div>
+    <div class="keymake" id="make" role="group" aria-label="Make this key"></div>
+    <div class="keyacts" id="keyacts">
+      <button class="btn iconbtn" id="alter-key" aria-label="Alter key" title="ALTER KEY (A): nudge this key's sound by the HOW MUCH amount in the RANDOM menu (UNDO takes it back)"><svg viewBox="0 0 24 20" aria-hidden="true"><path d="M2 4h20M2 10h20M2 16h20"/><rect x="5" y="1.5" width="4" height="5"/><rect x="14" y="7.5" width="4" height="5"/><rect x="8" y="13.5" width="4" height="5"/></svg><kbd>A</kbd></button>
+      <button class="btn keylock" id="lock-key" title="Freeze this key: nothing changes its sound until it's unlocked (L)"><svg viewBox="0 0 16 18" aria-hidden="true"><path class="shackle" d="M4 8V5a4 4 0 0 1 8 0v3"/><rect x="1.5" y="8" width="13" height="9" rx="1"/></svg><span>LOCK KEY</span><kbd>L</kbd></button>
+      <button class="btn sm" id="copy-key" title="Copy this key's sound (Cmd+C / Ctrl+C)">COPY</button>
+      <button class="btn sm" id="paste-key" disabled title="Paste the copied sound onto this key (Cmd+V / Ctrl+V; UNDO takes it back)">PASTE</button>
+      <button class="btn sm" id="clear-key" title="This key back to the engine's base sound (UNDO takes it back)">CLEAR</button>
+    </div>
+  </section>
+
+  <nav class="sounds" id="sounds" role="tablist" aria-label="Engines"><span class="dim tag">ENGINE</span><button class="btn fxtab" id="fx-tab" type="button" role="tab" aria-selected="false" title="The send effect and the master (F)"><span>FX + MASTER</span><kbd>F</kbd></button></nav>
+
+    <section class="editor">
+      <div class="faders" id="faders"></div>
+      <div class="lockveil" id="lockveil"><b>KEY LOCKED</b><span>nothing changes this key · LOCK KEY (L) unlocks it</span></div>
+      <footer class="status"><span id="detail">Play a key, then turn a knob: the change stays on that key. <span class="dim">[ ] step through the keys · Space plays it again</span></span>
+        <span class="dim" id="zones"></span></footer>
+    </section>
+    <aside class="fxside" id="fxside" aria-label="Effects" hidden>
+      <div id="fxglobal"></div>
+    </aside>
+  </div>
+  </div>
+
+  <!-- the phone view (a phone held upright, or ?phone): a pad for each of the 25 keys, and the few controls a hand needs -->
+  <div class="pv" id="pv">
+    <div class="pv-top"><h1 class="logo">VANDORU</h1><b id="pv-name"></b><button class="btn" id="pv-menu-btn" aria-haspopup="true" aria-expanded="false" aria-controls="pv-menu">MENU</button></div>
+    <div class="pv-menu" id="pv-menu" hidden>
+      <button class="btn" id="pv-rand-eng">RANDOM: ENGINE 1</button><span class="cap" id="pv-rand-eng-cap"></span>
+      <button class="btn" id="pv-alter-eng">ALTER: ENGINE 1</button><span class="cap" id="pv-alter-eng-cap"></span>
+      <button class="btn" id="pv-alter-all">ALTER ALL</button><span class="cap">NUDGE THE SOUNDS OF ALL 25 KEYS</span>
+    </div>
+    <div class="pv-pads" id="pv-pads" role="group" aria-label="The 25 keys"></div>
+    <div class="pv-key"><b id="pv-key"></b><span id="pv-what"></span></div>
+    <div class="pv-row">
+      <button class="btn two pvdice" id="pv-dice" aria-label="New sound on this key"><span class="die" id="pv-die"></span><span>NEW SOUND</span></button>
+      <button class="btn two" id="pv-alter">ALTER</button>
+      <button class="btn" id="pv-lock" aria-pressed="false">LOCK</button>
+    </div>
+    <div class="pv-send" id="pv-reverb"><span>REVERB</span><div class="track" role="slider" aria-label="This key's reverb send" aria-valuemin="0" aria-valuemax="127"><i></i></div><output>0</output></div>
+    <div class="pv-row">
+      <button class="btn two" id="pv-init" aria-pressed="false">INIT PATCH</button>
+      <button class="btn two" id="pv-random">RANDOM ALL</button>
+      <button class="btn" id="pv-undo" disabled>UNDO</button>
+    </div>
+    <div class="pv-msg" id="pv-msg">Press a pad to play its key. NEW SOUND gives that key another sound.</div>
+  </div>
+  <div class="start" id="start">
+    <button class="btn big" id="start-btn"><span class="dk">START AUDIO + MIDI</span><span class="ph">START</span></button>
+    <p id="start-text"></p>
+    <p class="ph" id="start-phone">A pad for each of the 25 keys. Press a pad to play it. NEW SOUND rolls the pad you pressed last.</p>
+  </div>
+</main>
+<script>
+// if the page's code fails to load or start (a stale cached file, an error), say so instead of sitting on START
+(function () {
+  var err = '';
+  addEventListener('error', function (e) { err = err || (e.message || 'a file failed to load'); }, true);
+  setTimeout(function () {
+    if (window.appReady) return;
+    var t = document.getElementById('start-text');
+    if (t) t.textContent = 'The page didn\'t finish loading (' + (err || 'timed out') + '). Reload it with Cmd+Shift+R (Ctrl+Shift+R on a PC).';
+  }, 5000);
+})();
+</script>
+<script type="module" src="app/main.js?v=mwmd7iyd"></script>
+</body>
+</html>

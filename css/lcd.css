@@ -1,0 +1,625 @@
+/* VANDORU: one pane of grey-green LCD glass in a black bezel. One ink, a faint ghost of
+   the unlit segments, the offset shadow LCD type casts on its backplane, a pixel font throughout. Buttons are outlined
+   boxes that invert when pressed or chosen; sliders and meters are segmented bars. Laid out for a laptop screen
+   (1440 x 900, 1280 x 800): nothing scrolls. */
+:root {
+  /* the screen's two colours, as r g b (SETTINGS > SCREEN COLOURS sets them on <html>); every other colour comes from them */
+  --panel-rgb: 167 181 140; --ink-rgb: 23 32 14; --shade-rgb: var(--ink-rgb); --glow: 1;
+  --panel: rgb(var(--panel-rgb)); --ink: rgb(var(--ink-rgb)); --muted: rgb(var(--ink-rgb) / .62); --ghost: rgb(var(--ink-rgb) / .11);
+  --tint: rgb(var(--ink-rgb) / .07); --rule: 1px solid rgb(var(--ink-rgb) / .32);
+  --font: "VT323", ui-monospace, monospace;
+  --shadow: 2px 2.2px .3px rgb(var(--ink-rgb) / .18);
+  --seg: 5px; --gap: 3px;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: radial-gradient(120% 80% at 50% 0%, #2a2d28, #161815) fixed; padding: 8px; overflow: hidden; font-family: var(--font); color: var(--ink); }
+button { font: inherit; color: inherit; }
+
+.screen {
+  position: relative; height: calc(100vh - 16px); max-width: 1600px; margin: 0 auto;
+  display: grid; grid-template-rows: auto auto auto 1fr; gap: 10px; padding: 12px 16px 14px;
+  border: 6px solid #0b0c0a; border-radius: 12px; user-select: none; -webkit-user-select: none;
+  text-shadow: var(--shadow); font-size: 20px; line-height: 1.1;
+  background-color: var(--panel);
+  background-image: linear-gradient(170deg, rgba(255, 255, 255, .14), rgba(255, 255, 255, 0) 38%, rgba(0, 0, 0, .05)),
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, .03) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgba(0, 0, 0, .03) 0 1px, transparent 1px 3px),
+    radial-gradient(60% 34% at 12% 100%, rgb(255 252 195 / calc(.5 * var(--glow))), rgb(255 252 200 / 0) 70%),
+    radial-gradient(52% 30% at 88% 102%, rgb(250 255 200 / calc(.4 * var(--glow))), rgb(250 255 205 / 0) 70%),
+    radial-gradient(38% 22% at 72% 38%, rgb(var(--shade-rgb) / .12), rgb(var(--shade-rgb) / 0) 70%),
+    linear-gradient(180deg, rgb(var(--shade-rgb) / .2) 0%, rgb(var(--shade-rgb) / 0) 30%),
+    radial-gradient(130% 100% at 50% 60%, rgba(0, 0, 0, 0) 55%, rgb(var(--shade-rgb) / .28) 100%);
+  box-shadow: inset 0 6px 16px rgba(0, 0, 0, .36), inset -8px 8px 18px rgba(0, 0, 0, .2), inset 0 0 0 1px rgba(255, 255, 255, .1);
+}
+.dim { color: var(--muted); }
+h2 { margin: 0 0 8px; font-size: 22px; font-weight: 400; letter-spacing: .14em; display: flex; gap: 10px; align-items: baseline; }
+h2 .dim { font-size: 18px; letter-spacing: .08em; }
+
+/* ---- buttons: an outlined box, inverted when pressed or chosen ---- */
+.btn { background: transparent; border: 2px solid var(--ink); border-radius: 3px; padding: 3px 12px; min-height: 34px;
+  text-transform: uppercase; letter-spacing: .06em; font-size: 19px; cursor: pointer; text-shadow: var(--shadow);
+  box-shadow: 2px 2.2px 0 rgb(var(--ink-rgb) / .14); white-space: nowrap; }
+.btn:hover { background: var(--tint); }
+.btn:active, .btn[aria-pressed="true"], .btn[aria-selected="true"] { background: var(--ink); color: var(--panel); text-shadow: none; }
+.btn:disabled { opacity: .3; cursor: default; background: transparent; color: var(--ink); }
+.btn.sm { min-height: 26px; font-size: 16px; padding: 1px 8px; }
+.btn.big { font-size: 28px; padding: 10px 28px; background: var(--ink); color: var(--panel); text-shadow: none; }
+.btn:focus-visible, .lock:focus-visible { outline: 2px dashed var(--ink); outline-offset: 2px; }
+
+/* ---- the top line ---- */
+.top { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.logo { margin: 0; font-size: 40px; font-weight: 400; letter-spacing: .12em; line-height: 1; padding: 0 6px 0 2px; white-space: nowrap; }
+.logo span { color: var(--muted); }
+.lcdbox { border: 2px solid var(--ink); border-radius: 3px; padding: 4px 10px; min-height: 34px; display: flex; align-items: center; gap: 8px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 18px; }
+.midi { flex: 0 1 180px; min-width: 100px; display: block; line-height: 24px; }
+.midi.live::before { content: "● "; }
+.last { flex: 1 1 auto; min-width: 0; }
+.lowkey { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.lowkey > .dim { letter-spacing: .08em; }
+.lowkey b { font-weight: 400; min-width: 5.6em; justify-content: center; }
+.lowkey .btn.sm { min-width: 28px; min-height: 30px; font-size: 20px; }
+.last b { font-weight: 400; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0; }
+.last.hit { background: var(--ink); color: var(--panel); text-shadow: none; }
+.last.hit .dim { color: var(--panel); opacity: .7; }
+.kitrand { display: flex; gap: 6px; align-items: center; }
+.kitrand > .dim { margin-right: 2px; letter-spacing: .1em; }
+
+/* ---- the seven sounds ---- */
+.sounds { display: grid; grid-template-columns: auto repeat(3, 1fr) minmax(0, .75fr); gap: 8px; align-items: center; }
+.sounds .tag { letter-spacing: .14em; font-size: 18px; padding-right: 4px; }
+.snd { position: relative; display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 38px; font-size: 21px; padding: 2px 8px; }
+.snd .ch { font-size: 16px; opacity: .7; }
+.snd i { position: absolute; left: 7px; top: 50%; width: 9px; height: 9px; margin-top: -5px; border: 2px solid currentColor; border-radius: 1px; }
+.snd i.on { background: currentColor; }
+
+/* ---- body: the side column and the editor ---- */
+.body { display: grid; grid-template-columns: clamp(330px, 28vw, 420px) 1fr; gap: 16px; min-height: 0; }
+.side { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.card { border-top: var(--rule); padding-top: 8px; }
+.side .card:first-child { border-top: 0; padding-top: 0; }
+
+/* horizontal segmented bars (morph depths, amount, level) */
+.bars { display: grid; gap: 4px; }
+.hb { display: grid; grid-template-columns: 74px 1fr 64px; align-items: center; gap: 10px; font-size: 19px; }
+.hb .lab { letter-spacing: .06em; cursor: default; }
+.hb output { text-align: right; font-variant-numeric: tabular-nums; }
+.htrack { --f: 0; position: relative; height: 22px; cursor: ew-resize; touch-action: none;
+  background: repeating-linear-gradient(to right, var(--ghost) 0 var(--seg), transparent var(--seg) calc(var(--seg) + var(--gap))); }
+.htrack i { position: absolute; left: 0; top: 0; bottom: 0; width: round(down, calc(var(--f) * 100%), 8px);
+  background: repeating-linear-gradient(to right, var(--ink) 0 var(--seg), transparent var(--seg) calc(var(--seg) + var(--gap)));
+  filter: drop-shadow(2px 2.2px 0 rgb(var(--ink-rgb) / .17)); }
+
+.seedrow { display: flex; align-items: center; gap: 10px; margin: 8px 0 6px; font-size: 19px; }
+.seed { font-weight: 400; font-size: 26px; letter-spacing: .14em; border: 2px solid var(--ink); padding: 0 8px; border-radius: 3px; min-width: 6.4em; text-align: center; }
+.seedrow .btn { margin-left: auto; }
+.side .card.grow { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.keymap { flex: 1; display: flex; flex-direction: column; min-height: 90px; }
+.keymap canvas { display: block; width: 100%; flex: 1; min-height: 0; }
+.keylabels { position: relative; height: 1.1em; font-size: 16px; color: var(--muted); margin-top: 2px; }
+.keylabels span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.keylabels .base { color: var(--ink); }
+
+.randrow { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.randrow .btn { flex: 1 1 auto; padding: 3px 6px; }
+.randrow.small { margin-top: 6px; gap: 6px; }
+.randrow.small .dim { flex: 1; white-space: nowrap; }
+.chk { position: relative; display: flex; align-items: center; gap: 6px; font-size: 19px; cursor: pointer; padding-right: 4px; }
+.chk input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.chk i { width: 20px; height: 20px; border: 2px solid var(--ink); border-radius: 2px; box-shadow: inset 0 0 0 3px var(--panel); }
+.chk input:checked + i { background: var(--ink); }
+.chk input:focus-visible + i { outline: 2px dashed var(--ink); outline-offset: 2px; }
+
+/* ---- the editor ---- */
+.editor { display: grid; grid-template-rows: 1fr auto; gap: 10px; min-height: 0; min-width: 0; }
+.pages { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.pages .btn { min-height: 38px; font-size: 22px; letter-spacing: .14em; }
+.faders { display: flex; gap: 0; min-height: 0; border: 2px solid var(--ink); border-radius: 3px; padding: 10px 6px 8px; }
+.sect { display: flex; flex-direction: column; min-width: 0; flex: var(--n) 1 0; padding: 0 6px; }
+.sect + .sect { border-left: var(--rule); }
+.sect h3 { margin: 0 0 6px; font-size: 18px; font-weight: 400; letter-spacing: .14em; color: var(--muted); text-transform: uppercase; }
+.sect .row { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 4px; flex: 1; min-height: 0; }
+.vf { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; min-height: 0; }
+.vf output { font-size: 19px; height: 1.1em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; font-variant-numeric: tabular-nums; }
+.vf .lab { font-size: 18px; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; cursor: default; }
+.vtrack { --f: 0; --m: 0; position: relative; width: min(52px, 100%); flex: 1; min-height: 60px; cursor: ns-resize; touch-action: none;
+  background: repeating-linear-gradient(to top, var(--ghost) 0 var(--seg), transparent var(--seg) calc(var(--seg) + var(--gap))); }
+.vtrack i { position: absolute; left: 0; right: 0; bottom: 0; height: round(down, calc(var(--f) * 100%), 8px);
+  background: repeating-linear-gradient(to top, var(--ink) 0 var(--seg), transparent var(--seg) calc(var(--seg) + var(--gap)));
+  filter: drop-shadow(2px 2.2px 0 rgb(var(--ink-rgb) / .17)); }
+/* the last played key's morphed value: a notch beside the bar */
+.vtrack b { display: none; position: absolute; left: -7px; right: -7px; height: 3px; bottom: calc(var(--m) * (100% - 3px)); background: var(--ink);
+  box-shadow: 0 0 0 2px var(--panel); }
+.vtrack.morphed b { display: block; }
+.vf.changed .lab::after { content: "*"; }
+.vf.keyed .lab, .vsel.keyed label { background: var(--ink); color: var(--panel); text-shadow: none; padding: 0 3px; }
+.keymap canvas { cursor: pointer; }
+body.learning [data-learn] { outline: 2px dashed var(--ink); outline-offset: 2px; cursor: crosshair; }
+.lock { border: 2px solid var(--ink); border-radius: 2px; background: transparent; font-size: 14px; line-height: 1; padding: 1px 4px 0; cursor: pointer;
+  letter-spacing: .06em; color: var(--muted); border-color: rgb(var(--ink-rgb) / .4); text-shadow: none; }
+.lock[aria-pressed="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+.lock.na { visibility: hidden; }
+.vsel { display: flex; flex-direction: column; gap: 6px; min-width: 0; justify-content: center; }
+.vsel label { font-size: 18px; text-transform: uppercase; letter-spacing: .04em; }
+.vsel select { font: inherit; font-size: 18px; color: var(--ink); background: transparent; border: 2px solid var(--ink); border-radius: 3px; padding: 4px; width: 100%; }
+.vsel select option, .vsel select optgroup { background: var(--panel); }
+.status { display: flex; justify-content: space-between; gap: 16px; font-size: 19px; white-space: nowrap; overflow: hidden; }
+.status #detail { overflow: hidden; text-overflow: ellipsis; }
+.status em { font-style: normal; background: var(--ink); color: var(--panel); padding: 0 4px; text-shadow: none; }
+
+/* ---- start: audio needs a press before it can play ---- */
+.start { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  background: rgb(var(--panel-rgb) / .88); border-radius: 6px; z-index: 10; text-align: center; }
+.start p { max-width: 30em; font-size: 22px; margin: 0; }
+.start[hidden] { display: none; }
+
+@media (max-width: 1340px) {
+  .screen { font-size: 18px; padding: 10px 12px 12px; }
+  .logo { font-size: 34px; }
+  .btn { font-size: 17px; padding: 3px 9px; }
+  .kitrand > .dim { display: none; }
+  .last > .dim { display: none; }
+  .top { gap: 10px; }
+  .logo { font-size: 30px; letter-spacing: .08em; }
+  .hb { grid-template-columns: 64px 1fr 56px; font-size: 18px; }
+  .snd { font-size: 20px; min-height: 42px; }
+}
+@media (max-height: 820px) {
+  .screen { gap: 8px; }
+  .bars { gap: 2px; }
+  .htrack { height: 19px; }
+  .seedrow { margin: 6px 0 4px; }
+  .randrow { margin-top: 6px; }
+}
+
+/* ---- the editor's knobs: every section of the sound at once, wrapping ---- */
+.pages[hidden] { display: none; }
+.faders { --kw: 78px; --ks: 52px; flex-wrap: wrap; align-content: flex-start; row-gap: 10px; padding: 8px 4px; overflow: hidden; }
+.sect { flex: 0 0 auto; padding: 0 8px; }
+.sect .row { display: grid; grid-template-columns: repeat(var(--n), var(--kw)); gap: 0; flex: none; }
+.sect h3 { margin-bottom: 2px; }
+.vf { gap: 1px; }
+.vf output { font-size: 17px; }
+.vf .lab { font-size: 16px; }
+.knob { width: var(--ks); height: var(--ks); cursor: ns-resize; touch-action: none; }
+.knob svg { display: block; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(2px 2.2px 0 rgb(var(--ink-rgb) / .17)); }
+.knob .tk { stroke: var(--ghost); stroke-width: 3.6; }
+.knob .tk.on { stroke: var(--ink); }
+.knob .ptr { stroke: var(--ink); stroke-width: 3.5; stroke-linecap: square; }
+.knob .notch { stroke: var(--ink); stroke-width: 4; display: none; }
+.knob.morphed .notch { display: inline; }
+.knob .lr { fill: var(--ink); font: 700 18px/1 var(--font); text-anchor: middle; }
+.sect .vsel { grid-column: span 2; justify-content: flex-start; padding: 18px 6px 0; }
+.sect .vsel label { white-space: nowrap; }
+@media (max-width: 1340px) { .faders { --kw: 66px; --ks: 44px; } .vf .lab { font-size: 15px; } .vf output { font-size: 16px; } }
+@media (max-height: 820px) { .faders { row-gap: 6px; } }
+
+/* ---- the RANDOM menu: everything that randomises a whole engine or all three ---- */
+.menu { position: relative; }
+.menupanel { position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; width: 430px; padding: 12px 14px 14px;
+  background: var(--panel); border: 2px solid var(--ink); border-radius: 3px; box-shadow: 6px 7px 0 rgba(11, 12, 10, .35); }
+.menupanel[hidden] { display: none; }
+.menupanel h3 { margin: 10px 0 6px; font-size: 18px; font-weight: 400; letter-spacing: .14em; border-top: var(--rule); padding-top: 8px; }
+.menupanel h3:first-child { margin-top: 0; border-top: 0; padding-top: 0; }
+.menupanel .randrow { margin-top: 6px; }
+
+/* ---- the key: the top of the hierarchy (key, then its engine, then its synth settings) ---- */
+.keyhead { display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: 18px; padding: 6px 12px;
+  border: 2px solid var(--ink); border-radius: 3px; min-width: 0; }
+.keyname { display: flex; align-items: baseline; gap: 8px; white-space: nowrap; }
+.keyname > .dim:first-child { letter-spacing: .14em; }
+.keyname b { font-weight: 400; font-size: 46px; line-height: 1; letter-spacing: .06em; min-width: 2.3em; }
+.keyinfo { display: flex; flex-direction: column; min-width: 0; max-width: 15em; line-height: 1.15; }
+.keyinfo b { font-weight: 400; font-size: 22px; letter-spacing: .14em; }
+.keyinfo span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.keyacts { display: flex; gap: 6px; align-items: center; }
+.keylock { display: flex; align-items: center; gap: 8px; min-width: 8.2em; min-height: 42px; font-size: 21px; }
+.keylock svg { width: 16px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; }
+.keylock[aria-pressed="false"] .shackle { transform: translate(5px, -2px); }
+.keylock[aria-pressed="true"] svg rect { fill: currentColor; }
+/* the strip: every key of the layout, grouped by engine */
+.keystrip { display: flex; gap: 10px; min-width: 0; justify-content: center; }
+.kgroup { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.kgroup .kz { font-size: 15px; letter-spacing: .12em; color: var(--muted); }
+.kgroup .keys { display: flex; gap: 2px; }
+.k { position: relative; width: 22px; height: 34px; padding: 0; border: 2px solid var(--ink); border-radius: 2px; background: transparent; cursor: pointer; color: var(--ink); }
+.k.blk { background: rgb(var(--ink-rgb) / .3); }
+.k.own::after { content: ""; position: absolute; left: 50%; top: 4px; width: 6px; height: 6px; margin-left: -3px; background: var(--ink); }
+.k svg { display: none; position: absolute; left: 50%; top: 50%; width: 12px; height: 14px; margin: -8px 0 0 -6px; fill: currentColor; stroke: currentColor; stroke-width: 2.4; }
+.k svg path { fill: none; }
+.k.locked svg { display: block; }
+.k.sel { background: var(--ink); color: var(--panel); outline: 2px solid var(--ink); outline-offset: 2px; }
+.k:hover { background: var(--tint); }
+.k.sel:hover { background: var(--ink); }
+/* a locked key: the key's header inverts, and the knobs are veiled */
+.keylocked .keyhead { background: var(--ink); color: var(--panel); text-shadow: none; }
+.keylocked .keyhead .dim, .keylocked .keyhead .kz { color: var(--panel); opacity: .7; }
+.keylocked .keyhead .btn { border-color: var(--panel); color: var(--panel); }
+.keylocked .keyhead .btn:disabled { opacity: .35; }
+.keylocked .keyhead .keylock { background: var(--panel); color: var(--ink); }
+.keylocked .keyhead .k { border-color: var(--panel); color: var(--panel); }
+.keylocked .keyhead .k.blk { background: rgb(var(--panel-rgb) / .3); }
+.keylocked .keyhead .k.own::after { background: var(--panel); }
+.keylocked .keyhead .k.sel { background: var(--panel); color: var(--ink); outline-color: var(--panel); }
+.editor { position: relative; }
+.faders, .lockveil { grid-area: 1 / 1; }
+.lockveil { display: none; z-index: 2; flex-direction: column; align-items: center; justify-content: center; gap: 6px; pointer-events: none;
+  background: repeating-linear-gradient(135deg, rgb(var(--ink-rgb) / .1) 0 3px, transparent 3px 11px); }
+.lockveil b { font-weight: 400; font-size: 34px; letter-spacing: .2em; background: var(--ink); color: var(--panel); padding: 2px 16px; text-shadow: none; }
+.lockveil span { background: var(--panel); padding: 0 8px; }
+.keylocked .lockveil { display: flex; }
+.keylocked .faders { opacity: .45; pointer-events: none; }
+@media (max-width: 1340px) {
+  .keyhead { gap: 12px; padding: 4px 10px; }
+  .keyname b { font-size: 40px; }
+  .k { width: 18px; height: 30px; }
+  .keystrip { gap: 6px; }
+  .keyinfo { max-width: 11em; }
+}
+
+/* ---- the FX page ---- */
+.snd.fx { letter-spacing: .1em; }
+.fxview .lockveil { display: none; }
+.fxview .faders { opacity: 1; pointer-events: auto; }
+.fxnote { flex: 1 0 100%; margin: 14px 8px 0; font-size: 19px; color: var(--muted); }
+.fxnote em { font-style: normal; background: var(--ink); color: var(--panel); padding: 0 4px; text-shadow: none; }
+.faders .sect .row .vf { padding-bottom: 0; }
+
+/* the key row keeps still: the key's name, number and info have fixed widths (G#3 is as wide as C3) */
+.keyname b { min-width: 0; width: 4.2ch; }
+.keyname #kh-num { width: 4ch; }
+.keyinfo { width: 14em; max-width: none; }
+@media (max-width: 1340px) { .keyinfo { width: 11em; } }
+
+/* ---- the side: the engine's level and its keys, one row each ---- */
+.body { grid-template-columns: clamp(300px, 24vw, 360px) 1fr; }
+.klhead { display: grid; grid-template-columns: 3.4em 1fr; margin: 12px 0 4px; font-size: 16px; font-weight: 400; letter-spacing: .14em; color: var(--muted); padding: 0 8px; }
+.keylist { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 3px; overflow: hidden; }
+.kl { display: grid; grid-template-columns: 3.4em 1fr auto; align-items: center; gap: 6px; flex: 1 1 0; min-height: 0; max-height: 40px; padding: 0 8px;
+  background: transparent; border: 2px solid rgb(var(--ink-rgb) / .35); border-radius: 3px; text-align: left; cursor: pointer; font-size: 19px; text-shadow: var(--shadow); }
+.kl b { font-weight: 400; letter-spacing: .06em; }
+.kl span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kl i { font-style: normal; font-size: 15px; letter-spacing: .1em; }
+.kl:hover { background: var(--tint); }
+.kl.locked { border-style: dashed; border-color: var(--ink); }
+.kl.sel { background: var(--ink); color: var(--panel); border-color: var(--ink); text-shadow: none; }
+@media (max-width: 1340px) { .kl { font-size: 17px; } }
+
+/* the engine row: each engine button placed under its key group (alignEngines in app/main.js) */
+.sounds { position: relative; display: block; height: 38px; }
+.sounds .tag { position: absolute; left: 0; top: 50%; transform: translateY(-50%); }
+.sounds .snd { position: absolute; top: 0; height: 38px; min-height: 0; padding: 2px 6px; gap: 6px; font-size: 20px; }
+.sounds .snd .ch { font-size: 15px; }
+@media (max-width: 1340px) { .sounds .snd { font-size: 18px; } .sounds .snd .ch { font-size: 13px; } }
+
+/* ---- body: the synth on the left, the FX on the right ---- */
+.body { grid-template-columns: 1fr auto; }
+.fxside { display: flex; flex-direction: column; gap: 4px; min-height: 0; border-left: var(--rule); padding-left: 14px; --kw: 62px; --ks: 42px; }
+.fxside h2 { margin-bottom: 2px; }
+.fxside .sendrow { display: grid; grid-template-columns: repeat(3, var(--kw)); padding-bottom: 6px; border-bottom: var(--rule); }
+.fxside .sect { padding: 6px 0 0; }
+.fxside .sect + .sect { border-left: 0; border-top: var(--rule); margin-top: 6px; }
+.fxside .sect .row { display: grid; grid-template-columns: repeat(var(--n), var(--kw)); }
+.fxside .vf output { font-size: 16px; } .fxside .vf .lab { font-size: 15px; }
+.fxside .knob { width: var(--ks); height: var(--ks); }
+@media (max-width: 1340px) { .fxside { --kw: 56px; --ks: 38px; padding-left: 10px; } .fxside .vf .lab { font-size: 14px; } }
+
+/* the master compressor's gain-reduction meter */
+.grm { display: grid; grid-template-columns: auto 1fr 4.6em; align-items: center; gap: 8px; margin-top: 4px; font-size: 15px; }
+.grm .segs { display: flex; gap: 2px; height: 14px; }
+.grm .segs i { flex: 1; background: var(--ghost); }
+.grm .segs i.on { background: var(--ink); }
+.grm output { font-size: 16px; text-align: right; font-variant-numeric: tabular-nums; }
+.fxside .sect { padding-top: 4px; }
+.fxside .sect + .sect { margin-top: 4px; }
+
+/* ---- the left column (the key, its engine, its synth) beside the FX and master column, full height ---- */
+.screen { grid-template-rows: auto 1fr; }
+.main { display: grid; grid-template-columns: 1fr auto; gap: 16px; min-height: 0; min-width: 0; }
+.left { display: grid; grid-template-rows: auto auto 1fr; gap: 10px; min-height: 0; min-width: 0; }
+.keyhead { grid-template-columns: auto auto 1fr; grid-template-areas: "name info acts" "strip strip strip"; row-gap: 6px; }
+.keyname { grid-area: name; } .keyinfo { grid-area: info; } .keyacts { grid-area: acts; justify-self: end; } .keystrip { grid-area: strip; }
+.keyhead .keyacts .btn { padding-left: 8px; padding-right: 8px; }
+.keyhead .keylock { min-width: 7.4em; }
+.fxside { padding-top: 2px; }
+.faders { --kw: 68px; --ks: 44px; }
+.fxside { --kw: 56px; --ks: 38px; }
+.keyhead .keyacts { gap: 5px; }
+.keyhead .keyacts .btn { font-size: 17px; min-height: 30px; }
+.keyhead .keylock { min-width: 7em; min-height: 36px; font-size: 19px; }
+.keyname b { font-size: 40px; }
+@media (max-width: 1340px) { .faders { --kw: 62px; --ks: 40px; } .fxside { --kw: 52px; --ks: 36px; } }
+
+.lowkey b.bpm { min-width: 3.2em; }
+
+/* ---- tidy-up: bigger knobs that fill the panel, clearer section headings, the key's big LEVEL bottom right ---- */
+.faders { --kw: 78px; --ks: 54px; position: relative; row-gap: 18px; padding: 10px 8px; align-content: flex-start; }
+.faders .sect h3 { color: var(--ink); margin-bottom: 6px; padding-bottom: 2px; border-bottom: 1px solid rgb(var(--ink-rgb) / .25); }
+.vf .lab { font-size: 15px; }
+.faders .vf.big { position: absolute; right: 18px; bottom: 14px; width: 132px; gap: 4px; }
+.faders .vf.big .knob { width: 104px; height: 104px; }
+.faders .vf.big output { font-size: 30px; height: auto; }
+.faders .vf.big .lab { font-size: 24px; letter-spacing: .16em; background: var(--ink); color: var(--panel); text-shadow: none; padding: 0 10px; }
+.faders .vf.big .lock { font-size: 15px; }
+.fxside h2 { margin-top: 6px; }
+.fxside .mout .row { display: flex; align-items: center; gap: 14px; }
+.grm { grid-template-columns: 1fr; gap: 4px; margin: 0; flex: 1; }
+.grm output { text-align: left; }
+@media (max-width: 1340px) { .faders { --kw: 66px; --ks: 46px; row-gap: 12px; } .faders .vf.big { width: 110px; } .faders .vf.big .knob { width: 84px; height: 84px; } }
+/* the master distortion: switches stand in a knob's place (a button named with its setting), the header buttons read
+   as a sentence, a section switched off is greyed (its knobs still turn), and the sidechain's envelope meter */
+.fxside .sect.dirt .row + .row { margin-top: 2px; }
+.fxside .sect.dirt h3 { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; white-space: nowrap; }
+.fxside .sect.dirt h3 .dim { font-size: 15px; letter-spacing: 1px; }
+.fxside .hdb { min-height: 20px; font-size: 15px; padding: 0 6px; line-height: 1; letter-spacing: 1px; }
+.fxside .hdb:first-of-type { margin-left: 2px; }
+.vsw .swb { width: calc(var(--kw) - 8px); height: var(--ks); display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--ink); border-radius: 3px; background: transparent; color: var(--ink); font: inherit; font-size: 15px;
+  letter-spacing: 0; padding: 0; cursor: pointer; }
+.vsw .swb:hover { background: var(--tint); }
+.vsw .swb[aria-pressed="true"] { background: var(--ink); color: var(--panel); }
+.vsw .swb:focus-visible { outline: 2px dashed var(--ink); outline-offset: 2px; }
+.fxside .sect.dirt.off > .row { opacity: .42; }
+.envm { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.envm .segs { height: var(--ks); width: 14px; display: flex; flex-direction: column-reverse; gap: 2px; }
+.envm .segs i { flex: 1; background: var(--ghost); }
+.envm .segs i.on { background: var(--ink); }
+.envm .lab { font-size: 15px; }
+
+/* the synth panel on one grid (buildFaders): equal cells, one knob to a cell (a menu takes two), four equal rows, the
+   key's FX sends and LEVEL in the last two columns. Rules sit on the cell edges and never move a knob */
+.faders { display: grid; grid-template-columns: repeat(13, minmax(0, 1fr)); grid-template-rows: repeat(4, minmax(0, 1fr));
+  gap: 0; padding: 4px 6px 6px; --ks: 50px; overflow: hidden; }
+.faders .sect { position: relative; min-width: 0; min-height: 0; padding: 4px 0 0; display: flex; flex-direction: column; }
+.faders .sect.rt, .faders .vf.big.rt { border-top: var(--rule); }
+.faders .sect + .sect { border-left: 0; }
+.faders .sect.sep::before, .faders .vf.big.sep::before { content: ''; position: absolute; left: 0; top: 6px; bottom: 6px; border-left: var(--rule); }
+.faders .sect h3 { padding: 0 8px; margin: 0 0 2px; border-bottom: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.faders .sect .row { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 0; align-items: start; }
+.faders .sect .vf .lab { font-size: 13px; letter-spacing: 0; padding: 0 3px; max-width: calc(100% - 4px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.faders .sect .vsel { grid-column: span 2; padding: 18px 8px 0; }
+.faders .vf.big { position: relative; right: auto; bottom: auto; justify-content: flex-end; padding-bottom: 6px; width: auto; }
+.faders .sect.fill::before { display: none; }
+/* MAKE THIS KEY: the recipe buttons in row 2's free cells, four to a row on the knob grid */
+.faders .sect.make .mk { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 4px 8px 0; align-content: start; }
+.faders .sect.make .mk .btn { padding: 4px 2px; min-width: 0; white-space: nowrap; overflow: hidden; }
+.faders .vf.big .knob { width: 96px; height: 96px; }
+@media (max-width: 1340px) { .faders { --ks: 44px; } .faders .vf.big .knob { width: 84px; height: 84px; } }
+@media (max-height: 820px) { .faders { --ks: 38px; } .faders .sect h3 { margin-bottom: 0; } .faders .vf.big .knob { width: 80px; height: 80px; } }
+@media (max-height: 820px) and (max-width: 1340px) { .faders { --ks: 36px; } }
+/* the right column on one set of columns: every effect's knobs, the distortion's switches, the ENV meter, the output
+   level and the gain-reduction meter all sit in the same six cells */
+.fxside .sect .row, .fxside .mout .row { display: grid; grid-template-columns: repeat(6, var(--kw)); gap: 0; align-items: start; }
+.fxside .mout .grm { grid-column: 2 / 7; align-self: center; padding-left: 8px; }
+.fxside .sect h3 { padding-left: 0; }
+
+/* ---- calmer knobs: each control's lock is a small padlock at the knob's top right (faint: open to the randomisers;
+   solid: locked) instead of a LOCK button under it, so the knobs get the room; a label is plain until you change
+   the control by hand on this key, then it's lit ---- */
+.vf { position: relative; }
+.lock { position: absolute; border: 0; background: transparent; padding: 1px; width: 14px; height: 16px; line-height: 0; cursor: pointer;
+  color: var(--ink); opacity: .26; left: calc(50% + var(--ks) / 2 - 3px); top: 19px; }
+.lock svg { display: block; width: 12px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2; }
+.lock { z-index: 1; }
+.lock::after { content: ""; position: absolute; inset: -6px -7px; } /* (a bigger target than the padlock itself, over the edge of the next knob's box) */
+.lock:hover { opacity: .7; background: transparent; }
+.lock[aria-pressed="true"] { opacity: 1; background: transparent; color: var(--ink); }
+.lock[aria-pressed="true"] svg rect { fill: currentColor; }
+.faders .vf.big .lock { top: auto; bottom: 9px; left: calc(50% + 50px); width: 18px; height: 20px; }
+.faders .vf.big .lock svg { width: 16px; height: 18px; }
+.faders { --ks: 58px; }
+.faders .vf.big .knob { width: 108px; height: 108px; }
+.faders .sect .vf .lab { font-size: 15px; }
+.faders .sect .vf output { font-size: 18px; }
+.faders .sect .vsel { padding-left: 18px; }
+@media (max-width: 1340px) { .faders { --ks: 50px; } .faders .vf.big .knob { width: 92px; height: 92px; } .faders .sect .vf .lab { font-size: 14px; } }
+@media (max-height: 820px) { .faders { --ks: 54px; } .faders .vf.big .knob { width: 96px; height: 96px; } }
+@media (max-height: 820px) and (max-width: 1340px) { .faders { --ks: 48px; } .faders .vf.big .knob { width: 88px; height: 88px; } }
+
+/* ---- the RANDOM menu on an even grid: two equal buttons a row, the sliders and WILD under HOW MUCH ---- */
+.menupanel { width: 470px; }
+.menupanel .randrow { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 6px; }
+.menupanel .randrow .btn { padding: 5px 6px; min-width: 0; }
+.menupanel .randrow .note { grid-column: span 2; align-self: center; font-size: 15px; letter-spacing: 1px; line-height: 1.15; }
+/* what each button does, under it, in its column */
+.menupanel .randrow .cap { font-size: 14px; letter-spacing: 1px; line-height: 1.15; text-align: center; margin-top: -3px; }
+.menupanel .randrow .cap.wide { grid-column: 1 / -1; }
+.menupanel .bars + .bars { margin-top: 6px; }
+.menupanel .chk.wild, .menupanel .chk.lvl { margin-top: 8px; font-size: 18px; }
+.menupanel .chk.lvl { margin-top: 6px; }
+.menupanel .chk.wild .dim, .menupanel .chk.lvl .dim { font-size: 15px; letter-spacing: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---- the keys that work a button, shown on it ---- */
+.btn kbd { font: inherit; font-size: 13px; line-height: 1; margin-left: 6px; padding: 1px 3px 0; border: 1px solid currentColor; border-radius: 2px; opacity: .55; letter-spacing: 0; }
+.btn:disabled kbd { opacity: .4; }
+.status #detail .dim { margin-left: 10px; }
+
+/* AUTO LEVEL's correction on the key: a chip at the head of the LEVEL cell, on the line of the row's headings */
+.faders .vf.big .auto { position: absolute; top: 0; left: 8px; min-height: 20px; font-size: 15px; padding: 0 6px; line-height: 1; letter-spacing: 1px; white-space: nowrap; }
+
+/* NEW SOUND: a dice at the top right of the synth block, the head of the key's own two columns (its FX sends and its
+   LEVEL are below it, on the same axis). Flat: a square with seven pips, the lit ones its face (the unlit ones show
+   faintly, like the unlit ticks of a knob's ring). Pressed, it turns once as its face changes */
+.faders .sect.dice h3 { display: flex; align-items: center; gap: 6px; }
+.faders .sect.dice h3 span { overflow: hidden; text-overflow: ellipsis; }
+.faders .sect.dice h3 kbd { font: inherit; font-size: 13px; line-height: 1; padding: 1px 3px 0; border: 1px solid currentColor; border-radius: 2px; opacity: .55; letter-spacing: 0; }
+.dicebtn { margin: auto; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; width: calc(var(--ks) + 14px); height: calc(var(--ks) + 14px); flex: none; }
+.dicebtn .die { display: block; width: 100%; height: 100%; box-sizing: border-box; border: 2px solid var(--ink); border-radius: 6px; }
+.dicebtn svg { display: block; width: 100%; height: 100%; }
+.dicebtn .pip { fill: var(--ink); opacity: .1; }
+.dicebtn .pip.on { opacity: 1; }
+.dicebtn:hover .die { background: var(--tint); }
+.dicebtn:active .die { background: var(--ink); }
+.dicebtn:active .pip { fill: var(--panel); }
+.dicebtn:focus-visible { outline: 2px dashed var(--ink); outline-offset: 3px; }
+.dicebtn:disabled { opacity: .3; cursor: default; }
+.dicebtn.roll .die { animation: dice-roll .32s cubic-bezier(.25, .6, .3, 1); }
+@keyframes dice-roll { from { transform: rotate(-360deg) scale(.8); } 60% { transform: rotate(-40deg) scale(1.06); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .dicebtn.roll .die { animation: none; } }
+
+/* ---- PRESETS: the patch's name in the top bar, beside the logo; its menu opens under it, from the left ---- */
+.pbtn { display: flex; align-items: center; gap: 8px; max-width: 300px; }
+.pbtn b { font-weight: 400; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pbtn i { font-style: normal; width: .6em; margin-left: -4px; }
+.pbtn:active .dim, .pbtn[aria-expanded="true"] .dim { color: inherit; }
+.menupanel.pleft { left: 0; right: auto; }
+.menupanel .pname { grid-column: span 2; min-width: 0; font: inherit; font-size: 20px; letter-spacing: 1px; text-transform: uppercase; color: var(--ink); background: transparent;
+  border: 2px solid var(--ink); border-radius: 3px; padding: 3px 8px; min-height: 34px; }
+.menupanel .pname:focus { outline: 2px dashed var(--ink); outline-offset: 2px; }
+.menupanel .plist { max-height: min(232px, 30vh); overflow-y: auto; border: 2px solid var(--ink); border-radius: 3px; }
+.menupanel .plist p { margin: 0; padding: 10px; font-size: 15px; letter-spacing: 1px; line-height: 1.3; }
+.menupanel .prow { display: grid; grid-template-columns: 1fr auto; align-items: stretch; border-top: 1px solid rgb(var(--ink-rgb) / .25); }
+.menupanel .prow:first-child { border-top: 0; }
+.menupanel .prow button { font: inherit; font-size: 18px; letter-spacing: 1px; color: var(--ink); background: transparent; border: 0; cursor: pointer; min-height: 28px; text-align: left; padding: 2px 10px; }
+.menupanel .prow .pload { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menupanel .prow .pdel { font-size: 15px; padding: 2px 10px; border-left: 1px solid rgb(var(--ink-rgb) / .25); text-align: center; min-width: 36px; }
+.menupanel .prow button:hover { background: var(--tint); }
+.menupanel .prow[aria-current="true"] .pload, .menupanel .prow .pdel[aria-pressed="true"] { background: var(--ink); color: var(--panel); text-shadow: none; }
+.menupanel .prow button:focus-visible { outline: 2px dashed var(--ink); outline-offset: -3px; }
+/* room for it in the top bar: the MIDI box is as wide as what it says and gives way first when the line is tight,
+   the last note's box takes what is left (its width never follows its text, so the boxes between stay put), the LOW
+   KEY box is a little narrower, and on a laptop-wide window the PRESET and LAST labels go and the logo is smaller */
+.midi { flex: 0 50 auto; min-width: 120px; max-width: 180px; }
+.last { flex: 1 1 190px; }
+.lowkey b { min-width: 4.6em; }
+@media (max-width: 1500px) { .last > .dim, .pbtn > .dim { display: none; } .pbtn b { max-width: 130px; } }
+@media (min-width: 1341px) and (max-width: 1500px) { .top { gap: 10px; } .logo { font-size: 36px; letter-spacing: .1em; } .lowkey > .dim { letter-spacing: .02em; } }
+
+/* ---- PHONE: a phone held upright gets a simpler screen (html.phone, set by the page): the 25 keys as pads, and under
+   them the pad pressed last with its dice, ALTER, LOCK and sends, then INIT PATCH, RANDOM ALL and UNDO. Everything on
+   one five-column grid, nothing scrolls ---- */
+.pv, .ph { display: none; }
+html.phone, html.phone body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+html.phone body { padding: 4px; touch-action: none; }
+html.phone .screen { display: block; height: calc(100vh - 8px); height: calc(100dvh - 8px); max-width: 520px; padding: 8px; border-width: 4px; border-radius: 10px; font-size: 18px; }
+html.phone .screen > :not(.pv):not(.start) { display: none; }
+html.phone .dk, html.phone #start-text { display: none; }
+html.phone .ph { display: revert; }
+html.phone .start { gap: 14px; padding: 0 18px; background: rgb(var(--panel-rgb) / .95); }
+html.phone .start p { font-size: 19px; line-height: 1.25; max-width: 20em; }
+html.phone .pv { position: relative; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: auto minmax(0, 1fr) repeat(6, auto); gap: 6px; height: 100%; }
+.pv > * { grid-column: 1 / -1; min-width: 0; }
+.pv-pads, .pv-row, .pv-send { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.pv-top { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; align-items: center; }
+.pv-top .logo { grid-column: span 2; font-size: 30px; letter-spacing: .08em; padding: 0; white-space: nowrap; }
+.pv-top b { grid-column: span 2; font-weight: 400; max-height: 2.1em; overflow: hidden; font-size: 17px; line-height: 1.05; letter-spacing: 1px; } /* (a name of two words takes two lines) */
+.pv-top .btn { min-width: 0; min-height: 40px; padding: 2px; font-size: 16px; touch-action: manipulation; }
+.pv-top .btn[aria-expanded="true"] { background: var(--ink); color: var(--panel); text-shadow: none; }
+/* the menu: over the pads and the buttons, from under the top row down to the message line, which stays in sight */
+.pv-menu { position: absolute; inset: -2px -5px -5px -2px; padding: 2px 5px 5px 2px; grid-row: 2 / 8; grid-column: 1 / -1; z-index: 3; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px 6px;
+  align-content: start; overflow: hidden; background: var(--panel); }
+.pv-menu[hidden] { display: none; }
+.pv-menu > .btn { grid-column: 1 / -1; min-width: 0; min-height: 50px; padding: 4px 2px; font-size: 19px; touch-action: manipulation; }
+.pv-menu > .cap { grid-column: 1 / -1; margin-bottom: 8px; font-size: 13px; line-height: 1.1; letter-spacing: 1px; opacity: .62; }
+.pv-pads { grid-auto-rows: minmax(0, 1fr); min-height: 0; }
+.pad { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-width: 0; min-height: 0; padding: 0;
+  border: 2px solid var(--ink); border-radius: 4px; background: transparent; color: var(--ink); font: inherit; text-shadow: var(--shadow); cursor: pointer;
+  touch-action: none; user-select: none; -webkit-user-select: none; }
+.pad.e0 { background: rgb(var(--ink-rgb) / .2); } /* the three engines, by shade: drum, snare, metal */
+.pad.e1 { background: rgb(var(--ink-rgb) / .09); }
+.pad b { font-weight: 400; font-size: 24px; line-height: 1; }
+.pad span { font-size: 13px; letter-spacing: 1px; line-height: 1; opacity: .62; }
+.pad svg { display: none; position: absolute; top: 5px; right: 5px; width: 11px; height: 13px; fill: currentColor; stroke: currentColor; stroke-width: 2.4; }
+.pad svg path { fill: none; }
+.pad.locked svg { display: block; }
+.pad.sel { box-shadow: inset 0 0 0 3px var(--ink); }
+.pad.down { background: var(--ink); color: var(--panel); text-shadow: none; }
+.pad:focus-visible { outline: 2px dashed var(--ink); outline-offset: 2px; }
+.pv-key { display: flex; align-items: baseline; gap: 8px; white-space: nowrap; overflow: hidden; margin-top: 2px; }
+.pv-key b { font-weight: 400; font-size: 26px; line-height: 1; }
+.pv-key span { overflow: hidden; text-overflow: ellipsis; font-size: 18px; }
+.pv-row > .btn { min-width: 0; min-height: 50px; padding: 4px 2px; font-size: 19px; touch-action: manipulation; }
+.pv-row > .two { grid-column: span 2; }
+.pv-row > .btn[aria-pressed="true"] { background: var(--ink); color: var(--panel); text-shadow: none; }
+.pvdice { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.pvdice .die { display: block; flex: none; width: 30px; height: 30px; border: 2px solid currentColor; border-radius: 5px; }
+.pvdice svg { display: block; width: 100%; height: 100%; }
+.pvdice .pip { fill: currentColor; opacity: .1; }
+.pvdice .pip.on { opacity: 1; }
+.pvdice.roll .die { animation: dice-roll .32s cubic-bezier(.25, .6, .3, 1); }
+@media (prefers-reduced-motion: reduce) { .pvdice.roll .die { animation: none; } }
+.pv-send > span { align-self: center; font-size: 17px; letter-spacing: 1px; }
+.pv-send .track { grid-column: 2 / 5; position: relative; height: 40px; border: 2px solid var(--ink); border-radius: 3px; cursor: pointer; touch-action: none; }
+.pv-send .track i { position: absolute; left: 3px; top: 3px; bottom: 3px; max-width: calc(100% - 6px); background: var(--ink); }
+.pv-send output { align-self: center; text-align: right; font-size: 22px; }
+.pv-msg { height: 2.4em; overflow: hidden; font-size: 15px; line-height: 1.2; letter-spacing: .5px; }
+.pv-msg em { font-style: normal; background: var(--ink); color: var(--panel); padding: 0 3px; text-shadow: none; }
+.pv-msg .dim { display: none; }
+
+/* ---- SETTINGS (top bar): LOW KEY and RETURN on one four-column grid (label, −, value, +), the hardware knobs below ---- */
+.menupanel.settings .lowkey { display: grid; grid-template-columns: 1fr 34px 1.3fr 34px; gap: 8px; align-items: center; margin-top: 6px; }
+.menupanel.settings .lowkey > .dim { font-size: 18px; letter-spacing: .1em; }
+.menupanel.settings .lowkey b { min-width: 0; justify-content: center; }
+.menupanel.settings .lowkey .btn.sm { min-height: 34px; min-width: 0; padding: 0; }
+.menupanel.settings .lowkey #ret { grid-column: 2 / 5; font-size: 19px; }
+.menupanel.settings .note { margin: 4px 0 6px; font-size: 14px; letter-spacing: 1px; line-height: 1.15; }
+.menupanel.settings .randrow .note { grid-column: 1 / -1; margin: 0; }
+
+/* ---- the merged voice: one engine's knobs fill the width; FX + MASTER is a tab of its own (Johnny, 2026-11-17) ---- */
+.main { grid-template-columns: 1fr; }
+.left { grid-template-rows: auto auto 1fr; }
+.left > .fxside { grid-row: 3; border-left: 0; padding: 8px 12px; border: var(--rule); min-height: 0; overflow: hidden; }
+.left > .fxside[hidden] { display: none; }
+.left > .editor[hidden] { display: none; }
+.sounds .fxtab { position: absolute; top: 0; right: 0; height: 38px; min-height: 0; padding: 2px 10px; gap: 6px; font-size: 20px; }
+.sounds .fxtab[aria-selected="true"] { background: var(--ink); color: var(--panel); text-shadow: none; }
+@media (max-width: 1340px) { .sounds .fxtab { font-size: 18px; } }
+.sounds .fxtab kbd { margin-left: 6px; }
+/* the effects on the tab: send FX in the first column, the master's distortion in the second, compressor and output in
+   the third, each section on the knob grid */
+#fxglobal { display: grid; grid-template-columns: repeat(3, auto); column-gap: 0; align-items: start; justify-content: start; }
+.fxcol { display: flex; flex-direction: column; gap: 4px; padding: 0 16px; }
+.fxcol + .fxcol { border-left: var(--rule); }
+.fxcol:first-child { padding-left: 4px; }
+.fxside > h2 { display: none; }
+.left > .fxside { --kw: 72px; --ks: 50px; }
+.left > .fxside .vf .lab { font-size: 15px; } .left > .fxside .vf output { font-size: 16px; }
+@media (max-width: 1340px) { .left > .fxside { --kw: 66px; --ks: 44px; } .fxcol { padding: 0 12px; } }
+.faders .sect.off > .row { opacity: .42; }
+.faders { grid-template-columns: repeat(16, minmax(0, 1fr)); } /* 14 cells of the engine's sections, then the key's own two */
+
+/* ENGINES 4 to 6: the second drum, snare and metal, shaded like the first */
+.pad.e3 { background: rgb(var(--ink-rgb) / .2); }
+.pad.e4 { background: rgb(var(--ink-rgb) / .09); }
+.sounds .snd[hidden] { display: none; }
+/* a narrow engine button (5 or 6 engines): the name only, the LED above it */
+.sounds .snd.narrow { padding: 12px 2px 0; font-size: 17px; letter-spacing: 0; white-space: nowrap; }
+.sounds .snd.narrow .ch { display: none; }
+.sounds .snd.narrow i { left: 50%; top: 4px; margin: 0 0 0 -4px; width: 7px; height: 7px; border-width: 1.5px; }
+/* SCREEN COLOURS: each look a button in its own two colours, on the menu's three-column grid; then PANEL and TEXT */
+.menupanel.settings .themes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.menupanel.settings .btn.theme { background: var(--tp); color: var(--ti); border-color: var(--ti); text-shadow: none; padding: 3px 4px; }
+.menupanel.settings .btn.theme[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--ink); }
+.menupanel.settings .lowkey.colour input, .menupanel.settings .lowkey.colour .btn { grid-column: 2 / 5; width: 100%; height: 34px; padding: 0 2px; border: 2px solid var(--ink); border-radius: 3px; background: transparent; cursor: pointer; }
+
+/* ---- the key row: the key strip (and the engine bar under it) starts under the key's engine info, on its column;
+   the dice and ALTER KEY are pictures in the key's row of buttons ---- */
+.keyhead { grid-template-areas: "name info acts" ". strip strip"; }
+.keystrip { justify-content: flex-start; }
+.keyacts .dicebtn { width: 36px; height: 36px; margin: 0; }
+.keyacts .iconbtn + .keylock { margin-left: 8px; }
+.keyacts .dicebtn .die { border-radius: 5px; }
+.keyacts .iconbtn { display: flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 8px; }
+.keyacts .iconbtn svg { width: 26px; height: 22px; fill: var(--panel); stroke: currentColor; stroke-width: 2; }
+.keyacts .iconbtn:hover svg { fill: var(--tint); }
+.keyacts .iconbtn:active svg rect { fill: currentColor; }
+.keylocked .keyhead .dicebtn .die { border-color: var(--panel); }
+.keylocked .keyhead .dicebtn .pip { fill: var(--panel); }
+.keylocked .keyhead .iconbtn svg { fill: var(--ink); }
+.keyacts .dicebtn:disabled { opacity: .35; cursor: default; }
+.keyacts .iconbtn kbd { margin-left: 0; }
+/* MAKE THIS KEY: under the key's buttons, two rows of six, right of the key strip */
+.keyhead { grid-template-columns: auto auto 1fr auto; grid-template-areas: "name info . acts" ". strip strip make"; }
+.keymake { grid-area: make; display: grid; grid-template-columns: auto repeat(6, 1fr); grid-template-rows: repeat(2, auto); gap: 3px 5px; align-self: end; }
+.keymake .mkl { grid-row: 1 / 3; align-self: center; font-size: 13px; line-height: 1; letter-spacing: .12em; padding-right: 4px; }
+.keymake .mk { display: contents; }
+.keymake .btn { min-height: 0; height: 24px; padding: 0 4px; font-size: 15px; min-width: 0; white-space: nowrap; overflow: hidden; }
+
+/* the key header's line (the sound, its type, its finish, where it came from, its edits) gets the room up to the dice */
+.keyinfo { width: 26em; }
+@media (max-width: 1340px) { .keyinfo { width: 22em; } }
+/* padlocks on a menu's and a switch's cell: at the cell's top right, clear of the box */
+.sect .vsel { position: relative; }
+.sect .vsel .lock { left: auto; right: 4px; top: 19px; }
+.vsw .lock { left: auto; right: 2px; top: 19px; }
+.fxside .note { margin-top: 12px; }
