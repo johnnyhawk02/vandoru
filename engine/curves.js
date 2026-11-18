@@ -5,8 +5,9 @@
 export const TICK_S = 64 / 44140;
 export const TICK_HZ = 44140 / 64;
 
-/** the shaping function S(x, s) = (1 + s)x / (1 + s|x|) */
-export const shape = (x, s) => (1 + s) * x / (1 + s * Math.abs(x));
+/** the shaping function S(x, s) = (1 + s)x / (1 + s|x|). At s = -1 (P CURVE 0) it is 0 inside and 1 at |x| = 1, its
+ *  limit there (S(1, s) is 1 for every s) */
+export const shape = (x, s) => { const d = 1 + s * Math.abs(x); return d === 0 ? Math.sign(x) : (1 + s) * x / d; };
 
 /** equal temperament, note 69 = 440 Hz, whole notes 0..127 */
 export const noteHz = (n) => 440 * Math.pow(2, (Math.min(127, Math.max(0, n)) - 69) / 12);

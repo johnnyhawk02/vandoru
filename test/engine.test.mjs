@@ -43,6 +43,39 @@ ok(lastAbove(renderSound(snd({ wave: 100, pwm: 0 }), { seconds: 0.1 }), 1e-6) < 
 { const a = renderSound(snd({ wave: 0 }), { seconds: 0.05 }), b = renderSound(snd({ wave: 25 }), { seconds: 0.05 }), m = renderSound(snd({ wave: 12.5 }), { seconds: 0.05 });
   let d = 0; for (let i = 0; i < a.length; i++) d = Math.max(d, Math.abs(m[i] - (a[i] + b[i]) / 2)); ok(d < 1e-6, `WAVE halfway is the mix of the two: ${d}`); }
 
+// FM (SPEC 5.5): a sine tone, a sine modulator at full A AMOUNT, FM ENV 0: the phase moves by max(0, A) cycles, one-sided;
+// on a saw tone by 4 times that. Checked against the formula, sample by sample, while the envelope is flat
+for (const [wave, scale, tbl] of [[0, 1, null], [50, 4, 'saw']]) {
+  const fs = 44140, s = snd({ wave, tune: 48, aFreq: 55, aAmount: 127, aWave: 0, fmEnv: 0, decay: 127, kind: 'metal', velVol: false });
+  const x = renderSound(s, { fs, seconds: 0.05, level: 127 });
+  const f0 = 440 * Math.pow(2, (48 - 69) / 12) * (1 + (64 / 127 - 0.5) * (Math.pow(2, 1 / 12) - 1)), fa = 440 * Math.pow(2, (55 - 69) / 12) * 1.000234;
+  let err = 0, below = 0;
+  for (let i = 200; i < 2000; i++) {
+    const p = 0.25 + f0 * i / fs, a = -Math.cos(2 * Math.PI * fa * i / fs), sh = Math.max(0, a) * scale;
+    const want = tbl ? null : -Math.cos(2 * Math.PI * (p + sh));
+    if (want !== null) err = Math.max(err, Math.abs(x[i] - want));
+    if (a < 0 && tbl === null && Math.abs(x[i] - -Math.cos(2 * Math.PI * p)) > 1e-3) below++;
+  }
+  if (!tbl) ok(err < 2e-3 && below === 0, `sine FM: one-sided, 1 cycle at full scale (error ${err.toFixed(4)}, ${below} samples moved by the negative half)`);
+  else { const y = renderSound({ ...s, aAmount: 0 }, { fs, seconds: 0.05 }); let d = 0; for (let i = 0; i < y.length; i++) d += Math.abs(x[i] - y[i]); ok(d / y.length > 0.1, 'saw FM moves the tone'); }
+}
+// the pitch envelope: P AMOUNT 127 starts the tone 33 times higher, and it falls back to the base pitch
+{
+  const fs = 44140, x = renderSound(snd({ tune: 36, pAmount: 127, pDecay: 40, pCurve: 64, decay: 127, kind: 'metal', velVol: false }), { fs, seconds: 0.6 });
+  const zc = (a, b) => { let n = 0; for (let i = a + 1; i < b; i++) if ((x[i - 1] < 0) !== (x[i] < 0)) n++; return n / 2 / ((b - a) / fs); };
+  const f0 = 440 * Math.pow(2, (36 - 69) / 12), early = zc(0, 64), late = zc(fs * 0.4, fs * 0.6);
+  ok(early > f0 * 25 && Math.abs(late / f0 - 1) < 0.03, `pitch envelope: ${early.toFixed(0)} Hz at the start, ${late.toFixed(1)} Hz later (base ${f0.toFixed(1)})`);
+}
+// the snap: CLICK SNAP at full CLICK VOL lifts the first ticks' pitch, gone after 5/r ticks
+{
+  const fs = 44140, s = snd({ tune: 36, click: 0, clickVol: 127, clickRate: 25, decay: 127, kind: 'metal', velVol: false });
+  const a = renderSound(s, { fs, seconds: 0.1 }), b = renderSound({ ...s, clickVol: 0 }, { fs, seconds: 0.1 });
+  let d0 = 0; for (let i = 0; i < 64; i++) d0 += Math.abs(a[i] - b[i]);
+  ok(d0 > 5, `the snap changes the start (${d0.toFixed(1)})`);
+}
+// PHASE: CLICK PHASE at full CLICK VOL starts a sine at its lowest point
+{ const x = renderSound(snd({ wave: 0, click: 1, clickVol: 127, kind: 'metal', velVol: false }), { seconds: 0.01 }); ok(x[0] < -0.99, `PHASE 127 starts a sine at -1: ${x[0].toFixed(3)}`); }
+
 // repeatability: the same render twice is identical
 { const s = snd({ wave: 125, decay: 40 }), a = renderSound(s), b = renderSound(s); ok(a.every((v, i) => v === b[i]), 'renders repeat exactly'); }
 // stability: random sounds never give NaN, infinity or over full scale

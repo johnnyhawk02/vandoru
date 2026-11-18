@@ -18,4 +18,4 @@ The browser test needs a local server: `python3 -m http.server 8123`, then `node
 
 ## Where it is
 
-Built in the steps of SPEC section 12. Done: the shell (1), kit import (2), and the engine core (3): the control tick, the six waves, pitch, the amp envelope with CURVE and REPEAT, level, velocity and pan. Still to come: the pitch envelope and FM (4), noise, the filter, drive and crush (5), the clicks (6), modulation (7), then the effects (9) and the rest.
+Built in the steps of SPEC section 12. Done: the shell (1), kit import (2), the engine core (3): the control tick, the six waves, pitch, the amp envelope with CURVE and REPEAT, level, velocity and pan, and (4) the pitch envelope, snap, PHASE, mod A and B with one-sided FM. Still to come: noise, the filter, drive and crush (5), the clicks (6), modulation (7), then the effects (9) and the rest.

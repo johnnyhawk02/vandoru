@@ -1,12 +1,13 @@
 // The voice (SPEC section 5): one engine's sound, one note at a time. Pure JS, rate-agnostic: the envelopes count
 // control ticks of 64/44140 s on a clock of their own, whatever the audio rate.
 //
-// Built so far (build order step 3): the tone with its six waves (band-limited) and the WAVE dial, its pitch (TUNE,
-// FINE), the amp envelope (ATTACK, DECAY, CURVE, REPEAT, glided in the drum kind, stepped in the others), LEVEL and
-// velocity, and the end of a sound. The pitch envelope, the modulators, noise, click, filter, drive, crush and the
-// modulation routes come in the next steps; the voice runs as if they were at rest.
-import { TICK_S, noteHz, fineFactor, riseStep, decayStep, decayShape, attackShape, shape } from './curves.js?v=mwmdta0r';
-import { TABLES, SINE, read, bandFor } from './waves.js?v=mwmdta0r';
+// Built so far (build order steps 3 and 4): the tone with its six waves (band-limited) and the WAVE dial, its pitch
+// (TUNE, FINE), the pitch envelope, the snap and PHASE, mod A and mod B with one-sided FM, FM ENV and A MODE, the amp
+// envelope (ATTACK, DECAY, CURVE, REPEAT, glided in the drum kind, stepped in the others), LEVEL and velocity, and the
+// end of a sound. Noise, the generated clicks, filter, drive, crush and the modulation routes come in the next steps;
+// the voice runs as if they were at rest.
+import { TICK_S, noteHz, fineFactor, MOD_FINE, riseStep, decayStep, decayShape, attackShape, pCurveShape, pAmountDepth, clickRate, shape } from './curves.js?v=mwmdy8tl';
+import { TABLES, SINE, read, bandFor } from './waves.js?v=mwmdy8tl';
 
 // the WAVE dial (SPEC 6.1), by position: sine 0, tri 25, saw 50, square 75, pwm 100, noise 125
 const STOPS = [0, 25, 50, 75, 100, 125];
@@ -29,6 +30,8 @@ class Osc {
   constructor() { this.ph = 0; this.held = 0; this.bands = [0, 0, 0]; }
   /** the band-limiting tables for this tick's frequency */
   tables(f, fs) { this.tri = TABLES.tri[bandFor('tri', f, fs)]; this.saw = TABLES.saw[bandFor('saw', f, fs)]; this.sq = TABLES.square[bandFor('square', f, fs)]; }
+  /** the dial's value at phase p: one wave, or two crossfaded (SPEC 6.1) */
+  dial(a, b, t, p, pw) { const x = this.wave(a, p, pw); return t > 0 ? x + (this.wave(b, p, pw) - x) * t : x; }
   wave(w, p, pw) {
     switch (w) {
       case SINE_W: return read(SINE, p);
@@ -42,13 +45,15 @@ class Osc {
 }
 
 const START = [0.25, 0.25, 0.25, 0.25, 0, 0]; // the tone's start phase by wave (SPEC 5.4)
+const FM_SCALE = [1, 4, 4, 4, 4, 0]; // cycles of phase shift for a full-scale modulator, by the tone's wave (SPEC 5.5)
+const wrap = (p) => p - Math.floor(p);
 
 export class Voice {
   constructor(fs) {
     this.fs = fs;
     this.spt = fs * TICK_S; // samples per control tick (64 at 44140 Hz)
-    this.tone = new Osc();
-    this.rand = new Rand();
+    this.tone = new Osc(); this.modA = new Osc(); this.modB = new Osc();
+    this.rand = new Rand(); this.randA = new Rand(0x68e31da4); this.randB = new Rand(0xb5297a4d);
     this.sound = null; this.active = false;
     this.freshNoise = false;
     this.lvlGlide = 1 - Math.exp(-1 / (0.0023 * fs)); // LEVEL's smoothing, about 2.3 ms
@@ -57,8 +62,13 @@ export class Voice {
   trigger(sound, vel, level, note = 60) {
     this.sound = sound; this.vel = vel; this.note = note;
     this.set(sound, level);
-    const [a, b, t] = dial(sound.wave);
-    this.tone.ph = START[t < 0.5 ? a : b]; this.tone.held = this.rand.next();
+    // start phases (SPEC 5.4): the nearer wave's; PHASE moves the tone's back towards the cycle's start
+    const near = (v) => { const [a, b, t] = dial(v); return t < 0.5 ? a : b; };
+    const o = Math.round(sound.click) === 1 ? 1 - sound.clickVol / 127 : 1;
+    this.tone.ph = START[near(sound.wave)] * o; this.tone.held = this.rand.next();
+    this.modA.ph = this.kind === 0 ? START[near(sound.aWave)] : 0; this.modA.held = this.randA.next();
+    this.modB.ph = 0; this.modB.held = this.randB.next();
+    this.u = 1; this.k = 1; // the pitch envelope and the snap
     // the amp envelope (SPEC 5.9): REPEAT skips the attack
     this.reps = Math.round(sound.repeat);
     this.stage = this.reps > 0 ? 'rep' : 'att';
@@ -79,7 +89,20 @@ export class Voice {
     this.pw = sound.pwm / 127 * 0.5;
     this.attStep = riseStep(sound.attack); this.decStep = decayStep(sound.decay);
     this.aShape = attackShape(sound.ampCurve); this.dShape = decayShape(sound.ampCurve);
-    this.toneLevel = 1 - sound.noise / 127;
+    // the pitch envelope (5.8) and the snap (5.7)
+    this.P = pAmountDepth(sound.pAmount); this.pStep = riseStep(sound.pDecay); this.pShape = pCurveShape(sound.pCurve);
+    this.snap = Math.round(sound.click) === 0 ? sound.clickVol / 127 : 0; this.snapStep = 0.2 * clickRate(sound.clickRate);
+    // mod A and mod B (5.5)
+    this.aAmt = sound.aAmount / 127; this.bAmt = sound.bAmount / 127;
+    this.aOn = this.aAmt > 0; this.bOn = this.bAmt > 0;
+    this.fA = noteHz(Math.round(sound.aFreq) + (this.note - 60)) * MOD_FINE; this.fB = noteHz(Math.round(sound.bFreq) + (this.note - 60)) * MOD_FINE;
+    [this.aa, this.ab, this.at] = dial(sound.aWave); [this.ba, this.bb, this.bt] = dial(sound.bWave);
+    this.mix = sound.aMode / 127; this.fmEnv = sound.fmEnv / 127;
+    this.modA.tables(this.fA, this.fs); this.modB.tables(this.fB, this.fs);
+    this.incA = this.fA / this.fs; this.incB = this.fB / this.fs;
+    this.scA = FM_SCALE[this.wa]; this.scB = FM_SCALE[this.wb];
+    // the tone's level: A MODE crossfades it towards the mixed-in A, NOISE towards the noise
+    this.toneLevel = (1 - this.mix * this.aAmt) * (1 - sound.noise / 127);
   }
   /** one control tick: the envelopes move, the oscillators pick their tables */
   tick() {
@@ -102,8 +125,15 @@ export class Voice {
     }
     // drum: glide to the new gain across the tick (but jump during a one-tick attack and its repeats); others: step
     if (this.kind !== 0 || (wasAttack && this.sound.attack === 0)) { this.gain = out; this.gStep = 0; } else this.gStep = (out - this.gain) / this.spt;
-    const f = this.base; // (x the pitch envelope and the snap from step 4)
+    // the pitch: m = 1 + P E + K, with E the pitch envelope's output and K the snap's (5.3)
+    const E = shape(this.u, this.pShape);
+    this.u = Math.max(0, this.u - this.pStep);
+    const K = 24 * this.k * this.k * this.snap;
+    this.k = Math.max(0, this.k - this.snapStep);
+    const f = this.base * (1 + this.P * E + K);
     this.inc = f / this.fs;
+    // the FM depth, by FM ENV (5.5)
+    this.D = (1 - this.fmEnv) + this.fmEnv * this.aAmt * E;
     this.tone.tables(f, this.fs);
   }
   /** writes n samples of the voice into out (mono) */
@@ -113,11 +143,27 @@ export class Voice {
     for (let i = 0; i < n; i++) {
       if (this.tickAt <= 0) { this.tick(); this.tickAt += this.spt; }
       this.tickAt -= 1;
-      // the tone
-      const p = tone.ph;
-      let T = tone.wave(this.wa, p, this.pw);
-      if (this.wt > 0) T += (tone.wave(this.wb, p, this.pw) - T) * this.wt;
-      T *= this.toneLevel;
+      // the modulators: A's FM part and B summed, clipped; A's MIX part added after the tone
+      let A = 0, M = 0;
+      if (this.aOn) {
+        const ma = this.modA; A = ma.dial(this.aa, this.ab, this.at, ma.ph, this.pw) * this.aAmt;
+        ma.ph += this.incA; if (ma.ph >= 1) { ma.ph -= Math.floor(ma.ph); ma.held = this.randA.next(); }
+        M = A * (1 - this.mix);
+      }
+      if (this.bOn) {
+        const mb = this.modB; M += mb.dial(this.ba, this.bb, this.bt, mb.ph, this.pw) * this.bAmt;
+        mb.ph += this.incB; if (mb.ph >= 1) { mb.ph -= Math.floor(mb.ph); mb.held = this.randB.next(); }
+        M = clip(M);
+      }
+      // the tone, phase-modulated by the positive half of M, each wave of the dial with its own depth
+      const p = tone.ph, sh = M > 0 ? this.D * M : 0;
+      let T;
+      if (sh === 0) T = tone.dial(this.wa, this.wb, this.wt, p, this.pw);
+      else {
+        T = tone.wave(this.wa, wrap(p + sh * this.scA), this.pw);
+        if (this.wt > 0) T += (tone.wave(this.wb, wrap(p + sh * this.scB), this.pw) - T) * this.wt;
+      }
+      T = clip(T * this.toneLevel + A * this.mix);
       tone.ph += this.inc;
       if (tone.ph >= 1) { tone.ph -= Math.floor(tone.ph); tone.held = this.rand.next(); }
       // routing and the finishing stage by kind (SPEC 5.11), with the parts built so far
