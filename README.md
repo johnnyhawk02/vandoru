@@ -11,3 +11,9 @@ No build step: serve the repo root with any static server and open `index.html`.
 ## Tests
 
 `node test/names-clean.test.mjs` and the other `test/*.test.mjs` files run in node. Tests that need the reference pack (in `local/pack/`, never committed) skip when it isn't there.
+
+The browser test needs a local server: `python3 -m http.server 8123`, then `node test/shots.mjs` (screenshots go to `local/shots/`).
+
+## Where it is
+
+Built in the steps of SPEC section 12. Step 1 (this shell) plays a stand-in sine on every key; the real voice arrives in steps 3 to 7, the reverb and compressor in step 9, kit import in step 2.
