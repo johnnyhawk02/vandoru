@@ -1,7 +1,7 @@
 // Modulation (SPEC 5.15 and 6.4): the LFO and the velocity route, each aimed at one of the sound's own parameters (or
 // the key's LEVEL or PAN). Each control tick a target's effective value is worked out from its knob and the modulator;
 // the parameter then behaves as if its knob were there. The knob itself never moves.
-import { lfoHz, syncHz, TICK_S } from './curves.js?v=mwmh7ohg';
+import { lfoHz, syncHz, TICK_S } from './curves.js?v=mwmt154h';
 
 // parameters that move in whole knob values (5.15); everything else moves continuously
 const STEPPED = new Set(['tune', 'aFreq', 'bFreq', 'fine', 'attack', 'decay', 'pDecay', 'pAmount', 'ampCurve', 'pCurve', 'repeat',
