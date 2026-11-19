@@ -1,8 +1,8 @@
 // The instrument: 1 to 6 mono engines, each playing one key's sound at a time, their mix, and the master (the
 // distortion, then the output level and a safety limiter). Pure JS, no DOM and no Web Audio: the worklet hosts it
 // for the speakers, and node runs it in the tests. The reverb send and the compressor come with step 9 (SPEC 7).
-import { Voice } from '../engine/voice.js?v=mwmeshlj';
-import { Dirt, DIRT_DEFAULTS } from './dirt.js?v=mwmeshlj';
+import { Voice } from '../engine/voice.js?v=mwmhdy23';
+import { Dirt, DIRT_DEFAULTS } from './dirt.js?v=mwmhdy23';
 
 export const MAX_ENGINES = 6;
 /** RETURN: an earlier held key comes back now, or on the next step of the BPM grid */
@@ -15,7 +15,8 @@ export const FX_DEFAULTS = {
   comp: { thresh: 12, ratio: 30, attack: 5, release: 120, knee: 6, makeup: 0 },
   out: { level: 80, eng: [127, 127, 127, 127, 127, 127] },
 };
-export const fxDefaults = () => structuredClone(FX_DEFAULTS);
+// (JSON, not structuredClone: the audio worklet has no structuredClone, and this runs there)
+export const fxDefaults = () => JSON.parse(JSON.stringify(FX_DEFAULTS));
 
 const MIX_GAIN = 0.8;
 
