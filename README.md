@@ -19,7 +19,7 @@ The browser test needs a local server: `python3 -m http.server 8123`, then `node
 ## Known differences
 
 - A loud snare whose tone, filtered noise and click together pass full scale is clipped there. The original wrapped round instead (an integer overflow), which gave a few snares a harsh crackle; that isn't copied (SPEC 5.11).
-- The filters are tuned an octave above the CUTOFF curve of SPEC 5.10: the compare test matches the reference best there (see `engine/filter.js`).
+- The filters are tuned an octave above the CUTOFF curve of SPEC 5.10: the compare test matches the reference best there (see `engine/filter.js`). The CUTOFF knob shows that real frequency.
 
 ## Where it is
 

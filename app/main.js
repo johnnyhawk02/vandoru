@@ -1,14 +1,14 @@
 // VANDORU: the page. 25 keys on MIDI channel 1, split between 1 to 6 mono engines; every key has its own sound, and
 // the knobs edit the key played last. The sound engine is in engine/ and sound/ (no UI there); this file holds the
 // state, the keys, MIDI, the knob grid, the randomisers, undo, presets, the FX + MASTER tab and the phone view.
-import { $, clamp, dragger, hbar, knob, switchCell, LOCK_SVG, DICE_SVG, makeDice } from './widgets.js?v=mwmhdy23';
-import { setupColours } from './colours.js?v=mwmhdy23';
-import { presetName, jumble } from './names.js?v=mwmhdy23';
-import { PARAMS, PARAM, OUT_PARAMS, GRID_ROWS, GRID_COLS, cells, TARGETS, targetLabel, showValue, noteName, dialAt } from '../sound/params.js?v=mwmhdy23';
-import { MAX_ENGINES, RETURNS, fxDefaults } from '../sound/instrument.js?v=mwmhdy23';
-import { DIRT_DEFAULTS, dirtHz, scHz, decayMs, volDb, pregainDb, bassDb } from '../sound/dirt.js?v=mwmhdy23';
-import { setupKits } from './kits.js?v=mwmhdy23';
-import { KEYS, DEFAULT_ENGINES, DEFAULT_LOW, TYPES, zones, engineOf, tidySound, newKey, tidyKey, tidyPatch, tidyFx, cleanName, canon, copySound } from './patch.js?v=mwmhdy23';
+import { $, clamp, dragger, hbar, knob, switchCell, LOCK_SVG, DICE_SVG, makeDice } from './widgets.js?v=mwmt154h';
+import { setupColours } from './colours.js?v=mwmt154h';
+import { presetName, jumble } from './names.js?v=mwmt154h';
+import { PARAMS, PARAM, OUT_PARAMS, GRID_ROWS, GRID_COLS, cells, TARGETS, targetLabel, showValue, noteName, dialAt } from '../sound/params.js?v=mwmt154h';
+import { MAX_ENGINES, RETURNS, fxDefaults } from '../sound/instrument.js?v=mwmt154h';
+import { DIRT_DEFAULTS, dirtHz, scHz, decayMs, volDb, pregainDb, bassDb } from '../sound/dirt.js?v=mwmt154h';
+import { setupKits } from './kits.js?v=mwmt154h';
+import { KEYS, DEFAULT_ENGINES, DEFAULT_LOW, TYPES, zones, engineOf, tidySound, newKey, tidyKey, tidyPatch, tidyFx, cleanName, canon, copySound } from './patch.js?v=mwmt154h';
 
 const STORE = 'vandoru-v1', PRESET_STORE = 'vandoru-presets-v1';
 const engName = (e) => `ENGINE ${e + 1}`;
@@ -17,7 +17,7 @@ const say = (html) => { $('detail').innerHTML = html; };
 // ---------------------------------------------------------------------------------------------------------------
 // the library: the starter set (hand-made, SPEC 8.6) and, from step 2, the imported kits' sounds
 // ---------------------------------------------------------------------------------------------------------------
-const STARTER = (await (await fetch(new URL('../sounds/starter.json?v=mwmhdy23', import.meta.url))).json()).map(tidySound);
+const STARTER = (await (await fetch(new URL('../sounds/starter.json?v=mwmt154h', import.meta.url))).json()).map(tidySound);
 const starterOf = (type) => STARTER.find((s) => s.type === type) || STARTER[0];
 let kits = { library: () => [], close() {} }; // the imported kits (the KITS menu, set up below)
 const library = () => [...STARTER, ...kits.library()];
@@ -88,7 +88,7 @@ const send = (m) => { if (node) node.port.postMessage(m); };
 async function startAudio() {
   if (ctx) { if (ctx.state !== 'running') await ctx.resume(); return; }
   ctx = new AudioContext({ latencyHint: 'interactive' });
-  await ctx.audioWorklet.addModule(new URL('../sound/worklet.js?v=mwmhdy23', import.meta.url));
+  await ctx.audioWorklet.addModule(new URL('../sound/worklet.js?v=mwmt154h', import.meta.url));
   node = new AudioWorkletNode(ctx, 'vandoru', { numberOfInputs: 0, outputChannelCount: [2] });
   node.port.onmessage = (e) => { if (e.data.type === 'peaks') { showPeaks(e.data.peaks); showSc(e.data.sc || 0); } };
   node.connect(ctx.destination);
